@@ -2,6 +2,7 @@ package com.steve.approval_service.dto;
 
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Getter
@@ -11,6 +12,6 @@ import java.util.UUID;
 @Builder
 public class ApprovalRequest {
     private UUID transactionId;
-    private Double amount;   // optional: transaction amount
+    private BigDecimal amount;   // optional: transaction amount
     private UUID accountId;  // optional: account reference
 }

@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
@@ -105,12 +106,22 @@ class TransactionServiceTest {
     @Test
     void getUserTransactions_returnsListOrderedByDate() {
         List<Transaction> transactions = List.of(
-                Transaction.builder().id(1L).accountNumber(ACCOUNT_NUM)
-                        .userEmail(USER_EMAIL).amount(BigDecimal.valueOf(100))
-                        .type(TransactionType.DEPOSIT).build(),
-                Transaction.builder().id(2L).accountNumber(ACCOUNT_NUM)
-                        .userEmail(USER_EMAIL).amount(BigDecimal.valueOf(200))
-                        .type(TransactionType.WITHDRAWAL).build()
+                Transaction.builder()
+                        .id(1L)
+                        .accountNumber(ACCOUNT_NUM)
+                        .userEmail(USER_EMAIL)
+                        .amount(BigDecimal.valueOf(100))
+                        .type(TransactionType.DEPOSIT)
+                        .createdAt(LocalDateTime.now())          // ← add this
+                        .build(),
+                Transaction.builder()
+                        .id(2L)
+                        .accountNumber(ACCOUNT_NUM)
+                        .userEmail(USER_EMAIL)
+                        .amount(BigDecimal.valueOf(200))
+                        .type(TransactionType.WITHDRAWAL)
+                        .createdAt(LocalDateTime.now().minusHours(1))  // ← add this
+                        .build()
         );
 
         when(transactionRepository.findByUserEmailOrderByCreatedAtDesc(USER_EMAIL))

@@ -8,4 +8,6 @@ import java.util.List;
 
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
     List<Transaction> findByUserEmail(String userEmail);
+    List<Transaction> findFirstByUserEmailOrderByCreatedAtDesc(String userEmail);
+    List<Transaction> findFirstByUserEmailOrderByCreatedAtDes(String userEmail);
 }

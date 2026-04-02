@@ -1,8 +1,9 @@
 package com.steve.transaction_service.dto;
 
+import lombok.Builder;
 import lombok.Data;
 import java.math.BigDecimal;
-
+@Builder
 @Data
 public class CreateTransactionRequest {
     private String accountNumber;

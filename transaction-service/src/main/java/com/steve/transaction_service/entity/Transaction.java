@@ -4,10 +4,10 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-
 @Entity
 @Table(name = "transactions")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -17,15 +17,26 @@ public class Transaction {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String accountNumber;   // account linked
-    private String userEmail;       // owner of the transaction
+    @Column(nullable = false)
+    private String accountNumber;
 
+    @Column(nullable = false)
+    private String userEmail;
+
+    @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal amount;
 
     @Enumerated(EnumType.STRING)
-    private TransactionType type;   // DEPOSIT, WITHDRAWAL, TRANSFER
+    @Column(nullable = false)
+    private TransactionType type;
 
-    private String targetAccount;   // for transfers
+    private String targetAccount;
 
+    @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @PrePersist
+    public void onCreate() {
+        this.createdAt = LocalDateTime.now();
+    }
 }

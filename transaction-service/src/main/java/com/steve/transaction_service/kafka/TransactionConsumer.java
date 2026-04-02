@@ -10,6 +10,12 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.stereotype.Service;
+
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TransactionConsumer {
@@ -18,21 +24,26 @@ public class TransactionConsumer {
 
     @KafkaListener(topics = "transactions", groupId = "transaction-service")
     public void consume(TransactionEvent event) {
-        Transaction tx = new Transaction();
-        tx.setAccountNumber(event.getAccountNumber());
-        tx.setAmount(event.getAmount());
+        log.info("Received transaction event: {} {} for account {}",
+                event.getType(), event.getAmount(), event.getAccountNumber());
 
-        // ✅ Safe enum conversion
+        TransactionType type;
         try {
-            tx.setType(TransactionType.valueOf(event.getType().toUpperCase()));
+            type = TransactionType.valueOf(event.getType().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new RuntimeException("Invalid transaction type: " + event.getType());
+            log.error("Unknown transaction type received: {}. Skipping.", event.getType());
+            return; // Don't throw — bad event should not kill the consumer
         }
 
-        tx.setUserEmail(event.getUserEmail());
-        tx.setTargetAccount(event.getTargetAccount()); // ✅ Added
-        tx.setCreatedAt(LocalDateTime.now());
+        Transaction tx = Transaction.builder()
+                .accountNumber(event.getAccountNumber())
+                .amount(event.getAmount())
+                .type(type)
+                .userEmail(event.getUserEmail())
+                .targetAccount(event.getTargetAccount())
+                .build();
 
         transactionRepository.save(tx);
+        log.info("Transaction persisted: id={}", tx.getId());
     }
 }

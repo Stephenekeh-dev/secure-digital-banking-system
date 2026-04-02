@@ -1,20 +1,38 @@
+server:
+  port: 8086
+
 spring:
   application:
     name: fraud-service
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/fraud_db
-    username: postgres
-    password: 1234567Steven..,
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/frauddb}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:changeme}
     driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
-      ddl-auto: update  # use 'create' only if you want to reset DB
+      ddl-auto: update
     show-sql: true
     properties:
       hibernate:
         format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
 
-server:
-  port: 8086 # unique port for Fraud Service
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+jwt:
+  secret: ${JWT_SECRET:u8F3nD9sK2qL1vR5bX7zW6pT4mQ0yA8e}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    root: INFO
+    org.hibernate.SQL: DEBUG

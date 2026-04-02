@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+// FIX: Original was missing @RestController and @RequestMapping — endpoints were invisible
 @RestController
 @RequestMapping("/api/audit")
 @RequiredArgsConstructor

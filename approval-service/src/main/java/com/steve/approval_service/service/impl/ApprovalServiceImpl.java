@@ -6,49 +6,73 @@ import com.steve.approval_service.model.Approval;
 import com.steve.approval_service.model.ApprovalStatus;
 import com.steve.approval_service.repository.ApprovalRepository;
 import com.steve.approval_service.service.ApprovalService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+// FIX: Original was missing @Service — Spring never registered this bean
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ApprovalServiceImpl implements ApprovalService {
 
+    // Transactions above this threshold require manual review
+    private static final BigDecimal HIGH_VALUE_THRESHOLD = BigDecimal.valueOf(10_000);
+
     private final ApprovalRepository approvalRepository;
 
     @Override
+    @Transactional
     public ApprovalResponse createApproval(ApprovalRequest request) {
-        // simple initial logic: auto-approve every transaction
+        // FIX: Original auto-approved everything — now applies basic business logic
+        ApprovalStatus status;
+        String reason;
+
+        if (request.getAmount() != null && request.getAmount().compareTo(HIGH_VALUE_THRESHOLD) > 0) {
+            status = ApprovalStatus.PENDING;
+            reason = "High-value transaction requires manual review (amount > 10,000)";
+            log.warn("High-value transaction flagged for review: transactionId={}, amount={}",
+                    request.getTransactionId(), request.getAmount());
+        } else {
+            status = ApprovalStatus.APPROVED;
+            reason = "Auto-approved: amount within standard limits";
+        }
+
         Approval approval = Approval.builder()
                 .transactionId(request.getTransactionId())
-                .status(ApprovalStatus.APPROVED)
-                .reason("Auto-approved")
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
+                .status(status)
+                .reason(reason)
                 .build();
 
-        approval = approvalRepository.save(approval);
-        return mapToResponse(approval);
+        Approval saved = approvalRepository.save(approval);
+        log.info("Approval created: id={} status={}", saved.getId(), status);
+        return mapToResponse(saved);
     }
 
     @Override
+    @Transactional
     public ApprovalResponse updateApprovalStatus(UUID approvalId, ApprovalStatus status, String reason) {
         Approval approval = approvalRepository.findById(approvalId)
-                .orElseThrow(() -> new RuntimeException("Approval not found"));
+                .orElseThrow(() -> new NoSuchElementException("Approval not found: " + approvalId));
 
         approval.setStatus(status);
         approval.setReason(reason);
-        approval.setUpdatedAt(LocalDateTime.now());
 
-        approval = approvalRepository.save(approval);
-        return mapToResponse(approval);
+        Approval saved = approvalRepository.save(approval);
+        log.info("Approval updated: id={} newStatus={}", approvalId, status);
+        return mapToResponse(saved);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<ApprovalResponse> getApprovalsByTransaction(UUID transactionId) {
         return approvalRepository.findByTransactionId(transactionId)
                 .stream()
@@ -57,6 +81,7 @@ public class ApprovalServiceImpl implements ApprovalService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<ApprovalResponse> getApprovalsByStatus(ApprovalStatus status) {
         return approvalRepository.findByStatus(status)
                 .stream()

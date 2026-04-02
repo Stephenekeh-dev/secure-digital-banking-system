@@ -5,27 +5,34 @@ import lombok.*;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import org.hibernate.annotations.GenericGenerator;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
+
 @Entity
 @Table(name = "approvals")
 @Getter
 @Setter
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Approval {
 
     @Id
-    @GeneratedValue
+    @GeneratedValue(generator = "UUID")
+    @GenericGenerator(name = "UUID", strategy = "org.hibernate.id.UUIDGenerator")
+    @Column(updatable = false, nullable = false)
     private UUID id;
 
     @Column(nullable = false)
-    private UUID transactionId;  // Reference to transaction-service record
+    private UUID transactionId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private ApprovalStatus status; // APPROVED / REJECTED / PENDING
+    private ApprovalStatus status;
 
-    private String reason; // e.g., "Insufficient balance"
+    private String reason;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -34,8 +41,9 @@ public class Approval {
 
     @PrePersist
     public void onCreate() {
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now();
+        this.createdAt = now;
+        this.updatedAt = now;
     }
 
     @PreUpdate
@@ -43,3 +51,4 @@ public class Approval {
         this.updatedAt = LocalDateTime.now();
     }
 }
+ 

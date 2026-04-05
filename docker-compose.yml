@@ -2,9 +2,9 @@ version: "3.9"
 
 services:
 
-  # ─────────────────────────────────────────
+
   # Infrastructure
-  # ─────────────────────────────────────────
+
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
@@ -30,7 +30,7 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     networks:
-      - banking-net
+       - banking-net
     healthcheck:
       test: [ "CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092" ]
       interval: 10s

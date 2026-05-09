@@ -1,14 +1,14 @@
 server:
-  port: 8087  # FIX: Original had 8083 — same as transaction-service (port conflict)
+  port: 8087
 
 spring:
   application:
     name: approval-service
 
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/approval_db}
-    username: ${SPRING_DATASOURCE_USERNAME:postgres}
-    password: ${SPRING_DATASOURCE_PASSWORD:1234567Steven..,}
+    url: jdbc:postgresql://localhost:5432/approval_db
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -21,7 +21,7 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
 jwt:
-  secret: ${JWT_SECRET:u8F3nD9sK2qL1vR5bX7zW6pT4mQ0yA8e}
+  secret: ${JWT_SECRET}
 
 management:
   endpoints:
@@ -33,3 +33,11 @@ logging:
   level:
     root: INFO
     org.hibernate.SQL: DEBUG
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    try-it-out-enabled: true
+    operations-sorter: method

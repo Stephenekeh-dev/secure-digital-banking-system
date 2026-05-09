@@ -6,9 +6,9 @@ spring:
     name: transaction-service
 
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/transactiondb}
-    username: ${SPRING_DATASOURCE_USERNAME:postgres}
-    password: ${SPRING_DATASOURCE_PASSWORD:1234567Steven..,}
+    url: jdbc:postgresql://localhost:5432/transactiondb
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -31,7 +31,7 @@ spring:
         spring.json.trusted.packages: "*"
 
 jwt:
-  secret: ${JWT_SECRET:u8F3nD9sK2qL1vR5bX7zW6pT4mQ0yA8e}
+  secret: ${JWT_SECRET}
 
 management:
   endpoints:
@@ -44,3 +44,11 @@ logging:
     root: INFO
     org.springframework.kafka: INFO
     org.hibernate.SQL: DEBUG
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    try-it-out-enabled: true
+    operations-sorter: method

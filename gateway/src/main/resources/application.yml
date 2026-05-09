@@ -1,5 +1,7 @@
 server:
   port: 8080
+  netty:
+    max-header-size: 65536
 
 spring:
   application:
@@ -11,7 +13,6 @@ spring:
         - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
 
       routes:
-        # ── Auth Service (public - no JWT filter) ──────────────────────────
         - id: auth-service
           uri: ${AUTH_SERVICE_URL:http://localhost:8081}
           predicates:
@@ -19,7 +20,6 @@ spring:
           filters:
             - StripPrefix=0
 
-        # ── Account Service (protected) ────────────────────────────────────
         - id: account-service
           uri: ${ACCOUNT_SERVICE_URL:http://localhost:8082}
           predicates:
@@ -28,7 +28,6 @@ spring:
             - StripPrefix=0
             - name: JwtAuthFilter
 
-        # ── Transaction Service (protected) ────────────────────────────────
         - id: transaction-service
           uri: ${TRANSACTION_SERVICE_URL:http://localhost:8083}
           predicates:
@@ -37,7 +36,6 @@ spring:
             - StripPrefix=0
             - name: JwtAuthFilter
 
-        # ── Notification Service (protected) ───────────────────────────────
         - id: notification-service
           uri: ${NOTIFICATION_SERVICE_URL:http://localhost:8084}
           predicates:
@@ -46,7 +44,6 @@ spring:
             - StripPrefix=0
             - name: JwtAuthFilter
 
-        # ── Audit Service (protected) ───────────────────────────────────────
         - id: audit-service
           uri: ${AUDIT_SERVICE_URL:http://localhost:8085}
           predicates:
@@ -55,7 +52,6 @@ spring:
             - StripPrefix=0
             - name: JwtAuthFilter
 
-        # ── Fraud Service (protected) ───────────────────────────────────────
         - id: fraud-service
           uri: ${FRAUD_SERVICE_URL:http://localhost:8086}
           predicates:
@@ -64,7 +60,6 @@ spring:
             - StripPrefix=0
             - name: JwtAuthFilter
 
-        # ── Approval Service (protected) ────────────────────────────────────
         - id: approval-service
           uri: ${APPROVAL_SERVICE_URL:http://localhost:8087}
           predicates:
@@ -72,6 +67,56 @@ spring:
           filters:
             - StripPrefix=0
             - name: JwtAuthFilter
+
+        # Swagger routes
+        - id: auth-service-docs
+          uri: ${AUTH_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/auth-service/v3/api-docs
+          filters:
+            - RewritePath=/auth-service/v3/api-docs, /v3/api-docs
+
+        - id: account-service-docs
+          uri: ${ACCOUNT_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/account-service/v3/api-docs
+          filters:
+            - RewritePath=/account-service/v3/api-docs, /v3/api-docs
+
+        - id: transaction-service-docs
+          uri: ${TRANSACTION_SERVICE_URL:http://localhost:8083}
+          predicates:
+            - Path=/transaction-service/v3/api-docs
+          filters:
+            - RewritePath=/transaction-service/v3/api-docs, /v3/api-docs
+
+        - id: notification-service-docs
+          uri: ${NOTIFICATION_SERVICE_URL:http://localhost:8084}
+          predicates:
+            - Path=/notification-service/v3/api-docs
+          filters:
+            - RewritePath=/notification-service/v3/api-docs, /v3/api-docs
+
+        - id: audit-service-docs
+          uri: ${AUDIT_SERVICE_URL:http://localhost:8085}
+          predicates:
+            - Path=/audit-service/v3/api-docs
+          filters:
+            - RewritePath=/audit-service/v3/api-docs, /v3/api-docs
+
+        - id: fraud-service-docs
+          uri: ${FRAUD_SERVICE_URL:http://localhost:8086}
+          predicates:
+            - Path=/fraud-service/v3/api-docs
+          filters:
+            - RewritePath=/fraud-service/v3/api-docs, /v3/api-docs
+
+        - id: approval-service-docs
+          uri: ${APPROVAL_SERVICE_URL:http://localhost:8087}
+          predicates:
+            - Path=/approval-service/v3/api-docs
+          filters:
+            - RewritePath=/approval-service/v3/api-docs, /v3/api-docs
 
       globalcors:
         corsConfigurations:
@@ -85,19 +130,36 @@ spring:
               - OPTIONS
             allowedHeaders: "*"
 
+springdoc:
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    try-it-out-enabled: true
+    config-url: /v3/api-docs/swagger-config
+    urls:
+      - name: auth-service
+        url: /auth-service/v3/api-docs
+      - name: account-service
+        url: /account-service/v3/api-docs
+      - name: transaction-service
+        url: /transaction-service/v3/api-docs
+      - name: notification-service
+        url: /notification-service/v3/api-docs
+      - name: audit-service
+        url: /audit-service/v3/api-docs
+      - name: fraud-service
+        url: /fraud-service/v3/api-docs
+      - name: approval-service
+        url: /approval-service/v3/api-docs
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+
 jwt:
-  secret: ${JWT_SECRET:u8F3nD9sK2qL1vR5bX7zW6pT4mQ0yA8e}
+  secret: ${JWT_SECRET:defaultSecretKey123}
 
 management:
   endpoints:
     web:
       exposure:
         include: health,info,routes
-  endpoint:
-    health:
-      show-details: always
-
-logging:
-  level:
-    org.springframework.cloud.gateway: DEBUG
-    root: INFO

@@ -1,4 +1,4 @@
-package com.steve.approval_service.config;
+package com.steve.fraud_service.config;
 
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
@@ -16,8 +16,8 @@ public class SwaggerConfig {
     public OpenAPI openAPI() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("Approval Service API")
-                        .description("Approves or rejects flagged transactions based on business rules")
+                        .title("Fraud Service API")
+                        .description("Detects, records and manages suspicious financial activity")
                         .version("1.0.0")
                         .contact(new Contact()
                                 .name("Steve")

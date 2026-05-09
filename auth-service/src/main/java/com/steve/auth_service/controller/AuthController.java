@@ -1,17 +1,12 @@
 package com.steve.auth_service.controller;
 
-
-
+import com.steve.auth_service.security.JwtUtil;
 import com.steve.auth_service.dto.AuthResponse;
 import com.steve.auth_service.dto.LoginRequest;
 import com.steve.auth_service.dto.RegisterRequest;
-import com.steve.auth_service.kafka.AuditEventProducer;
 import com.steve.auth_service.model.User;
+import com.steve.auth_service.kafka.AuditEventProducer;
 import com.steve.auth_service.repository.UserRepository;
-import com.steve.auth_service.security.JwtUtil;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,9 +18,13 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.Map;
 
 @Slf4j
@@ -39,32 +38,42 @@ public class AuthController {
     private final JwtUtil jwtUtil;
     private final AuditEventProducer auditEventProducer;
 
-    @Value("${file.upload-dir:uploads/}")
+    @Value("${file.upload-dir:C:/Users/User/Desktop/banking-system/uploads/}")
     private String uploadDir;
 
     @PostMapping(value = "/register", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<?> register(@Valid @ModelAttribute RegisterRequest request) throws IOException {
-        if (userRepository.existsByEmail(request.getEmail())) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body(Map.of("error", "Email already registered"));
+    public ResponseEntity<?> register(@Valid @ModelAttribute RegisterRequest request) {
+        try {
+            // Check if email already exists
+            if (userRepository.existsByEmail(request.getEmail())) {
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                        .body(Map.of("error", "Email already registered"));
+            }
+
+            // Save profile picture
+            String relativePath = saveProfilePicture(request.getProfilePicture());
+
+            // Create and save user
+            User user = User.builder()
+                    .fullName(request.getFullName())
+                    .email(request.getEmail())
+                    .password(passwordEncoder.encode(request.getPassword()))
+                    .profilePictureUrl(relativePath)
+                    .role("USER")
+                    .build();
+
+            userRepository.save(user);
+            auditEventProducer.sendRegistrationAudit(user.getEmail());
+            log.info("User registered successfully: {}", user.getEmail());
+
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(Map.of("message", "User registered successfully. Please log in."));
+
+        } catch (Exception e) {
+            log.error("Registration error: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Registration failed: " + e.getMessage()));
         }
-
-        String relativePath = saveProfilePicture(request.getProfilePicture());
-
-        User user = User.builder()
-                .fullName(request.getFullName())
-                .email(request.getEmail())
-                .password(passwordEncoder.encode(request.getPassword()))
-                .profilePictureUrl(relativePath)
-                .role("USER")
-                .build();
-
-        userRepository.save(user);
-        auditEventProducer.sendRegistrationAudit(user.getEmail());
-        log.info("User registered: {}", user.getEmail());
-
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(Map.of("message", "User registered successfully. Please log in."));
     }
 
     @PostMapping("/login")
@@ -75,7 +84,7 @@ public class AuthController {
                     String token = jwtUtil.generateToken(user.getEmail());
                     auditEventProducer.sendLoginAudit(user.getEmail(), true);
                     log.info("Login success: {}", user.getEmail());
-                    return ResponseEntity.ok(AuthResponse.builder()
+                    return ResponseEntity.ok((Object) AuthResponse.builder()
                             .token(token)
                             .email(user.getEmail())
                             .fullName(user.getFullName())
@@ -86,7 +95,7 @@ public class AuthController {
                     auditEventProducer.sendLoginAudit(request.getEmail(), false);
                     log.warn("Login failed for: {}", request.getEmail());
                     return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                            .body(null);
+                            .body(Map.of("error", "Invalid email or password"));
                 });
     }
 
@@ -96,20 +105,31 @@ public class AuthController {
         if (file == null || file.isEmpty()) {
             return null;
         }
-        File dir = new File(uploadDir);
-        if (!dir.exists()) dir.mkdirs();
 
-        String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
-        file.transferTo(new File(dir, fileName));
-        return "/uploads/" + fileName;
-    }
+        // Build absolute path and create directories if missing
+        Path uploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
 
-    // ── Exception Handlers ────────────────────────────────────────────────────
+        if (!Files.exists(uploadPath)) {
+            Files.createDirectories(uploadPath);
+            log.info("Created upload directory: {}", uploadPath);
+        }
 
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, String>> handleError(Exception e) {
-        log.error("Auth error: {}", e.getMessage());
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", "An unexpected error occurred"));
+        // Sanitize filename — remove unsafe characters
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null || originalFilename.isBlank()) {
+            originalFilename = "file";
+        }
+        String safeFilename = System.currentTimeMillis() + "_"
+                + originalFilename.replaceAll("[^a-zA-Z0-9._-]", "_");
+
+        Path destination = uploadPath.resolve(safeFilename);
+
+        // Copy file using NIO — avoids Tomcat temp directory issues
+        try (InputStream inputStream = file.getInputStream()) {
+            Files.copy(inputStream, destination, StandardCopyOption.REPLACE_EXISTING);
+        }
+
+        log.info("Profile picture saved: {}", destination.toAbsolutePath());
+        return "/uploads/" + safeFilename;
     }
 }

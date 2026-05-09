@@ -1,4 +1,4 @@
-package com.steve.approval_service.config;
+package com.steve.gateway.config;
 
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
@@ -16,12 +16,12 @@ public class SwaggerConfig {
     public OpenAPI openAPI() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("Approval Service API")
-                        .description("Approves or rejects flagged transactions based on business rules")
+                        .title("Banking System API Gateway")
+                        .description("Central entry point routing to all the microservices")
                         .version("1.0.0")
                         .contact(new Contact()
-                                .name("Steve")
-                                .email("steve@bank.com")))
+                                .name("Stephen")
+                                .email("steveadibee@yahoo.com")))
                 .addSecurityItem(
                         new SecurityRequirement().addList("Bearer Authentication"))
                 .components(new Components()

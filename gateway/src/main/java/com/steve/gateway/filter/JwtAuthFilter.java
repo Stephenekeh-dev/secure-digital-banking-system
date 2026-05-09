@@ -36,7 +36,20 @@ public class JwtAuthFilter extends AbstractGatewayFilterFactory<JwtAuthFilter.Co
     @Override
     public GatewayFilter apply(Config config) {
         return (exchange, chain) -> {
-            String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+            String path = exchange.getRequest().getURI().getPath();
+
+            // Skip JWT check for Swagger and API docs paths
+            if (path.contains("/swagger-ui") ||
+                    path.contains("/v3/api-docs") ||
+                    path.contains("/swagger-resources") ||
+                    path.contains("/webjars") ||
+                    path.contains("/actuator")) {
+                return chain.filter(exchange);
+            }
+
+            String authHeader = exchange.getRequest()
+                    .getHeaders()
+                    .getFirst(HttpHeaders.AUTHORIZATION);
 
             if (authHeader == null || !authHeader.startsWith("Bearer ")) {
                 log.warn("Missing or malformed Authorization header");
@@ -46,7 +59,8 @@ public class JwtAuthFilter extends AbstractGatewayFilterFactory<JwtAuthFilter.Co
             String token = authHeader.substring(7);
 
             try {
-                Key key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+                Key key = Keys.hmacShaKeyFor(
+                        secret.getBytes(StandardCharsets.UTF_8));
                 Claims claims = Jwts.parserBuilder()
                         .setSigningKey(key)
                         .build()
@@ -58,7 +72,6 @@ public class JwtAuthFilter extends AbstractGatewayFilterFactory<JwtAuthFilter.Co
                     return unauthorised(exchange);
                 }
 
-                // Forward the authenticated user's email to downstream services
                 ServerWebExchange mutated = exchange.mutate()
                         .request(r -> r.header("X-User-Email", email))
                         .build();
@@ -71,7 +84,6 @@ public class JwtAuthFilter extends AbstractGatewayFilterFactory<JwtAuthFilter.Co
             }
         };
     }
-
     private Mono<Void> unauthorised(ServerWebExchange exchange) {
         exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
         return exchange.getResponse().setComplete();

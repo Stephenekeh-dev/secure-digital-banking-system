@@ -1,28 +1,35 @@
 package com.steve.notification_service.kafka;
 
-import com.steve.notification_service.dto.NotificationRequest;
-import com.steve.notification_service.service.NotificationService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.stereotype.Component;
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Component;
 
-// FIX: Original was missing @Component and @RequiredArgsConstructor
-// FIX: notificationService field was never injected — NPE at runtime
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class NotificationConsumer {
 
-    private final NotificationService notificationService;
+    private final JavaMailSender mailSender;
 
-    @KafkaListener(topics = "notification-topic", groupId = "notification-group")
-    public void consume(NotificationRequest request) {
-        log.info("Received notification request for: {}", request.getRecipient());
-        notificationService.sendNotification(request);
+    @KafkaListener(
+            topics = "notification-topic",
+            groupId = "notification-group"
+    )
+    public void handleNotification(NotificationEvent event) {
+        log.info("Notification received for: {}", event.getEmail());
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setTo(event.getEmail());
+            message.setSubject(event.getSubject());
+            message.setText(event.getMessage());
+            message.setFrom("ekehsteven2@gmail.com");
+            mailSender.send(message);
+            log.info("Email sent successfully to: {}", event.getEmail());
+        } catch (Exception e) {
+            log.error(" Failed to send email to {}: {}", event.getEmail(), e.getMessage());
+        }
     }
 }

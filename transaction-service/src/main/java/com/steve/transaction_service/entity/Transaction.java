@@ -18,6 +18,10 @@ public class Transaction {
     private Long id;
 
     @Column(nullable = false)
+    private String transactionId;    // ← add this field
+
+
+    @Column(nullable = false)
     private String accountNumber;
 
     @Column(nullable = false)

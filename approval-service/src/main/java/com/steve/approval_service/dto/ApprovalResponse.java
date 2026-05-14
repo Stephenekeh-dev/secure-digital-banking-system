@@ -12,8 +12,8 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 public class ApprovalResponse {
-    private UUID id;
-    private UUID transactionId;
+    private Long id;
+    private String transactionId;
     private ApprovalStatus status;
     private String reason;
     private LocalDateTime createdAt;

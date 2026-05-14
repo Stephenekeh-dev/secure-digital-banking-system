@@ -1,25 +1,28 @@
-package com.steve.approval_service;
+package com.steve.approval_service.service;
 
 import com.steve.approval_service.dto.ApprovalRequest;
 import com.steve.approval_service.dto.ApprovalResponse;
 import com.steve.approval_service.model.Approval;
 import com.steve.approval_service.model.ApprovalStatus;
+import com.steve.approval_service.model.TransactionType;
 import com.steve.approval_service.repository.ApprovalRepository;
 import com.steve.approval_service.service.impl.ApprovalServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.*;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
-import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.when;
 
 class ApprovalServiceTest {
 
@@ -33,23 +36,19 @@ class ApprovalServiceTest {
 
     @Test
     void createApproval_autoApproves_whenAmountBelowThreshold() {
-        UUID txId = UUID.randomUUID();
         ApprovalRequest request = ApprovalRequest.builder()
-                .transactionId(txId)
+                .transactionId("TXN-ABC12345")   // ← String not UUID
                 .amount(BigDecimal.valueOf(500))
                 .build();
 
         when(approvalRepository.save(any())).thenAnswer(inv -> {
             Approval a = inv.getArgument(0);
-            a = Approval.builder()
-                    .id(UUID.randomUUID())
+            return Approval.builder()
+                    .id(1L)                          // ← Long not UUID
                     .transactionId(a.getTransactionId())
                     .status(a.getStatus())
                     .reason(a.getReason())
-                    .createdAt(LocalDateTime.now())
-                    .updatedAt(LocalDateTime.now())
                     .build();
-            return a;
         });
 
         ApprovalResponse response = approvalService.createApproval(request);
@@ -60,21 +59,18 @@ class ApprovalServiceTest {
 
     @Test
     void createApproval_setsPending_whenAmountAboveThreshold() {
-        UUID txId = UUID.randomUUID();
         ApprovalRequest request = ApprovalRequest.builder()
-                .transactionId(txId)
+                .transactionId("TXN-XYZ98765")   // ← String not UUID
                 .amount(BigDecimal.valueOf(15_000))
                 .build();
 
         when(approvalRepository.save(any())).thenAnswer(inv -> {
             Approval a = inv.getArgument(0);
             return Approval.builder()
-                    .id(UUID.randomUUID())
+                    .id(2L)                          // ← Long not UUID
                     .transactionId(a.getTransactionId())
                     .status(a.getStatus())
                     .reason(a.getReason())
-                    .createdAt(LocalDateTime.now())
-                    .updatedAt(LocalDateTime.now())
                     .build();
         });
 
@@ -86,13 +82,11 @@ class ApprovalServiceTest {
 
     @Test
     void updateApprovalStatus_updatesSuccessfully() {
-        UUID approvalId = UUID.randomUUID();
+        Long approvalId = 1L;                        // ← Long not UUID
         Approval existing = Approval.builder()
                 .id(approvalId)
-                .transactionId(UUID.randomUUID())
+                .transactionId("TXN-ABC12345")       // ← String not UUID
                 .status(ApprovalStatus.PENDING)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
                 .build();
 
         when(approvalRepository.findById(approvalId)).thenReturn(Optional.of(existing));
@@ -107,22 +101,25 @@ class ApprovalServiceTest {
 
     @Test
     void updateApprovalStatus_throwsWhenNotFound() {
-        UUID id = UUID.randomUUID();
+        Long id = 99L;                               // ← Long not UUID
         when(approvalRepository.findById(id)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() ->
-                approvalService.updateApprovalStatus(id, ApprovalStatus.REJECTED, "Fraud suspected"))
+                approvalService.updateApprovalStatus(
+                        id, ApprovalStatus.REJECTED, "Fraud suspected"))
                 .isInstanceOf(NoSuchElementException.class)
                 .hasMessageContaining("Approval not found");
     }
 
     @Test
     void getApprovalsByTransaction_returnsMatchingList() {
-        UUID txId = UUID.randomUUID();
+        String txId = "TXN-ABC12345";                // ← String not UUID
         List<Approval> approvals = List.of(
-                Approval.builder().id(UUID.randomUUID()).transactionId(txId)
-                        .status(ApprovalStatus.APPROVED).createdAt(LocalDateTime.now())
-                        .updatedAt(LocalDateTime.now()).build()
+                Approval.builder()
+                        .id(1L)
+                        .transactionId(txId)
+                        .status(ApprovalStatus.APPROVED)
+                        .build()
         );
         when(approvalRepository.findByTransactionId(txId)).thenReturn(approvals);
 
@@ -135,12 +132,16 @@ class ApprovalServiceTest {
     @Test
     void getApprovalsByStatus_returnsMatchingList() {
         List<Approval> pending = List.of(
-                Approval.builder().id(UUID.randomUUID()).transactionId(UUID.randomUUID())
-                        .status(ApprovalStatus.PENDING).createdAt(LocalDateTime.now())
-                        .updatedAt(LocalDateTime.now()).build(),
-                Approval.builder().id(UUID.randomUUID()).transactionId(UUID.randomUUID())
-                        .status(ApprovalStatus.PENDING).createdAt(LocalDateTime.now())
-                        .updatedAt(LocalDateTime.now()).build()
+                Approval.builder()
+                        .id(1L)
+                        .transactionId("TXN-AAA111")
+                        .status(ApprovalStatus.PENDING)
+                        .build(),
+                Approval.builder()
+                        .id(2L)
+                        .transactionId("TXN-BBB222")
+                        .status(ApprovalStatus.PENDING)
+                        .build()
         );
         when(approvalRepository.findByStatus(ApprovalStatus.PENDING)).thenReturn(pending);
 
@@ -150,4 +151,3 @@ class ApprovalServiceTest {
         result.forEach(r -> assertThat(r.getStatus()).isEqualTo(ApprovalStatus.PENDING));
     }
 }
-

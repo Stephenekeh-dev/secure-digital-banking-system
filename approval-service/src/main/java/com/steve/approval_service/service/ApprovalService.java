@@ -9,7 +9,9 @@ import java.util.UUID;
 
 public interface ApprovalService {
     ApprovalResponse createApproval(ApprovalRequest request);
-    ApprovalResponse updateApprovalStatus(UUID approvalId, ApprovalStatus status, String reason);
-    List<ApprovalResponse> getApprovalsByTransaction(UUID transactionId);
+    ApprovalResponse updateApprovalStatus(Long approvalId,       // ← Long
+                                          ApprovalStatus status,
+                                          String reason);
+    List<ApprovalResponse> getApprovalsByTransaction(String transactionId); // ← String
     List<ApprovalResponse> getApprovalsByStatus(ApprovalStatus status);
 }

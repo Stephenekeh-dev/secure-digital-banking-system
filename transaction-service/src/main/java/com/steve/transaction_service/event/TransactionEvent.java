@@ -1,5 +1,6 @@
 package com.steve.transaction_service.event;
 
+import com.steve.transaction_service.entity.TransactionType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -13,9 +14,10 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 @Builder
 public class TransactionEvent {
+    private String transactionId;    // ← add this field
     private String accountNumber;
-    private BigDecimal amount;
-    private String type;           // DEPOSIT | WITHDRAWAL | TRANSFER
     private String userEmail;
+    private BigDecimal amount;
+    private String type;
     private String targetAccount;
 }

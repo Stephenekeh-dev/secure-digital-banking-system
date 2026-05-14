@@ -24,6 +24,10 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+        max.block.ms: 2000
+        request.timeout.ms: 2000
 
 file:
   upload-dir: C:/Users/User/Desktop/banking-system/uploads/

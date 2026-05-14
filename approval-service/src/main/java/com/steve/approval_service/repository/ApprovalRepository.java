@@ -5,9 +5,10 @@ import com.steve.approval_service.model.ApprovalStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
-import java.util.UUID;
 
-public interface ApprovalRepository extends JpaRepository<Approval, UUID> {
-    List<Approval> findByTransactionId(UUID transactionId);
+public interface ApprovalRepository extends JpaRepository<Approval, Long> {
     List<Approval> findByStatus(ApprovalStatus status);
+    List<Approval> findByUserEmail(String userEmail);
+    List<Approval> findByTransactionId(String transactionId);
+    boolean existsByTransactionId(String transactionId);  // ← add this
 }

@@ -22,28 +22,40 @@ public class TransactionConsumer {
 
     private final TransactionRepository transactionRepository;
 
-    @KafkaListener(topics = "transactions", groupId = "transaction-service")
-    public void consume(TransactionEvent event) {
-        log.info("Received transaction event: {} {} for account {}",
-                event.getType(), event.getAmount(), event.getAccountNumber());
-
-        TransactionType type;
+    @KafkaListener(
+            topics = "transactions",
+            groupId = "transaction-service-group"
+    )
+    public void consumeTransaction(TransactionEvent event) {
         try {
-            type = TransactionType.valueOf(event.getType().toUpperCase());
-        } catch (IllegalArgumentException e) {
-            log.error("Unknown transaction type received: {}. Skipping.", event.getType());
-            return; // Don't throw — bad event should not kill the consumer
+            log.info("Kafka event received: transactionId={}, account={}, type={}, amount={}",
+                    event.getTransactionId(), event.getAccountNumber(),
+                    event.getType(), event.getAmount());
+
+            // Convert String to TransactionType enum safely
+            TransactionType transactionType;
+            try {
+                transactionType = TransactionType.valueOf(event.getType().toUpperCase());
+            } catch (Exception e) {
+                log.warn("Unknown transaction type: {}, defaulting to DEPOSIT", event.getType());
+                transactionType = TransactionType.DEPOSIT;
+            }
+
+            Transaction transaction = Transaction.builder()
+                    .transactionId(event.getTransactionId())
+                    .accountNumber(event.getAccountNumber())
+                    .userEmail(event.getUserEmail())
+                    .amount(event.getAmount())
+                    .type(transactionType)              // ← now passing enum
+                    .targetAccount(event.getTargetAccount())
+                    .createdAt(LocalDateTime.now())
+                    .build();
+
+            transactionRepository.save(transaction);
+            log.info("Transaction saved: {}", event.getTransactionId());
+
+        } catch (Exception e) {
+            log.error("Failed to process transaction: {}", e.getMessage(), e);
         }
-
-        Transaction tx = Transaction.builder()
-                .accountNumber(event.getAccountNumber())
-                .amount(event.getAmount())
-                .type(type)
-                .userEmail(event.getUserEmail())
-                .targetAccount(event.getTargetAccount())
-                .build();
-
-        transactionRepository.save(tx);
-        log.info("Transaction persisted: id={}", tx.getId());
     }
 }

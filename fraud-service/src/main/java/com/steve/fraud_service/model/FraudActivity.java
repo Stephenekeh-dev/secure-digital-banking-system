@@ -32,12 +32,12 @@ public class FraudActivity {
     private BigDecimal amount;
 
     @Column(nullable = false, updatable = false)
-    private LocalDateTime timestamp;
+    private LocalDateTime flaggedAt;
 
     @PrePersist
     public void onCreate() {
-        if (this.timestamp == null) {
-            this.timestamp = LocalDateTime.now();
+        if (this.flaggedAt == null) {
+            this.flaggedAt = LocalDateTime.now();
         }
     }
 }

@@ -47,7 +47,7 @@ public class ApprovalServiceImpl implements ApprovalService {
         }
 
         Approval approval = Approval.builder()
-                .transactionId(request.getTransactionId())
+                .transactionId(request.getTransactionId().toString())
                 .status(status)
                 .reason(reason)
                 .build();
@@ -57,23 +57,23 @@ public class ApprovalServiceImpl implements ApprovalService {
         return mapToResponse(saved);
     }
 
-    @Override
-    @Transactional
-    public ApprovalResponse updateApprovalStatus(UUID approvalId, ApprovalStatus status, String reason) {
+    public ApprovalResponse updateApprovalStatus(Long approvalId,    // ← Long not UUID/String
+                                                 ApprovalStatus status,
+                                                 String reason) {
         Approval approval = approvalRepository.findById(approvalId)
-                .orElseThrow(() -> new NoSuchElementException("Approval not found: " + approvalId));
-
+                .orElseThrow(() -> new NoSuchElementException(
+                        "Approval not found: " + approvalId));
         approval.setStatus(status);
         approval.setReason(reason);
-
-        Approval saved = approvalRepository.save(approval);
-        log.info("Approval updated: id={} newStatus={}", approvalId, status);
-        return mapToResponse(saved);
+        approvalRepository.save(approval);
+        log.info("Approval {} updated to status: {}", approvalId, status);
+        return mapToResponse(approval);
     }
+
 
     @Override
     @Transactional(readOnly = true)
-    public List<ApprovalResponse> getApprovalsByTransaction(UUID transactionId) {
+    public List<ApprovalResponse> getApprovalsByTransaction(String transactionId) { // ← String
         return approvalRepository.findByTransactionId(transactionId)
                 .stream()
                 .map(this::mapToResponse)
@@ -92,7 +92,7 @@ public class ApprovalServiceImpl implements ApprovalService {
     private ApprovalResponse mapToResponse(Approval approval) {
         return ApprovalResponse.builder()
                 .id(approval.getId())
-                .transactionId(approval.getTransactionId())
+                .transactionId(approval.getTransactionId().toString())
                 .status(approval.getStatus())
                 .reason(approval.getReason())
                 .createdAt(approval.getCreatedAt())

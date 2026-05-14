@@ -1,5 +1,8 @@
 package com.steve.account_service.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 import java.math.BigDecimal;
 
@@ -8,12 +11,25 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 @Builder
 public class CreateAccountRequest {
-    // optional: client may request an initial deposit
+
+    @Schema(
+            description = "Initial deposit amount. Defaults to 0.00 if not provided.",
+            example = "5000.00"
+    )
+    @DecimalMin(value = "0.0", inclusive = true, message = "Initial balance cannot be negative")
     private BigDecimal initialBalance;
 
-    // optional: usually generated server-side; accept if client provides
+    @Schema(
+            description = "Account number. Leave blank to auto-generate.",
+            example = ""
+    )
     private String accountNumber;
 
-    // optional/metadata
-    private String accountType; // e.g. "SAVINGS", "CHECKING"
+    @NotBlank(message = "Account type is required")
+    @Schema(
+            description = "Type of account",
+            example = "SAVINGS",
+            allowableValues = {"SAVINGS", "CHECKING"}
+    )
+    private String accountType;
 }

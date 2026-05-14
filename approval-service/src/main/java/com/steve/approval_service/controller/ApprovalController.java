@@ -33,7 +33,7 @@ public class ApprovalController {
 
     @PutMapping("/{id}/status")
     public ResponseEntity<ApprovalResponse> updateApprovalStatus(
-            @PathVariable UUID id,
+            @PathVariable Long id,
             @RequestParam ApprovalStatus status,
             @RequestParam(required = false) String reason) {
         return ResponseEntity.ok(approvalService.updateApprovalStatus(id, status, reason));
@@ -41,7 +41,7 @@ public class ApprovalController {
 
     @GetMapping("/transaction/{transactionId}")
     public ResponseEntity<List<ApprovalResponse>> getApprovalsByTransaction(
-            @PathVariable UUID transactionId) {
+            @PathVariable String transactionId) {
         return ResponseEntity.ok(approvalService.getApprovalsByTransaction(transactionId));
     }
 

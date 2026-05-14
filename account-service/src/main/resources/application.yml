@@ -37,6 +37,11 @@ management:
       exposure:
         include: health,info
 
+logging:
+  level:
+    org.springframework.security: DEBUG
+    com.steve.account_service: DEBUG
+
 springdoc:
   api-docs:
     path: /v3/api-docs

@@ -11,7 +11,9 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 public class ApprovalRequest {
-    private UUID transactionId;
-    private BigDecimal amount;   // optional: transaction amount
-    private UUID accountId;  // optional: account reference
+    private String transactionId;    // ← String not UUID
+    private String userEmail;
+    private String accountNumber;
+    private BigDecimal amount;
+    private String transactionType;
 }

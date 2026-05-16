@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: banking-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+    spec:
+      containers:
+        - name: gateway
+          image: us-central1-docker.pkg.dev/YOUR_PROJECT_ID/banking-repo/gateway:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: banking-secrets
+                  key: JWT_SECRET
+            - name: AUTH_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: banking-config
+                  key: AUTH_SERVICE_URL
+            - name: ACCOUNT_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: banking-config
+                  key: ACCOUNT_SERVICE_URL
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway-service
+  namespace: banking-system
+spec:
+  type: LoadBalancer        # ← gives public IP
+  selector:
+    app: gateway
+  ports:
+    - port: 80
+      targetPort: 8080

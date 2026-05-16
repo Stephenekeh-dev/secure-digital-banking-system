@@ -1,0 +1,9 @@
+# k8s/postgres/postgres-init-configmap.yml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: banking-system
+data:
+  init.sql: |
+    CREATE DATABASE bankingdb;

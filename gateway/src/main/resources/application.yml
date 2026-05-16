@@ -7,6 +7,16 @@ spring:
   application:
     name: gateway
 
+  # ← DELETE these 7 lines below
+  # security:
+  #   user:
+  #     name: disabled
+  #     password: disabled
+  # autoconfigure:
+  #   exclude:
+  #     - org.springframework.boot.autoconfigure.security.reactive.ReactiveSecurityAutoConfiguration
+  #     - org.springframework.boot.autoconfigure.security.reactive.ReactiveUserDetailsServiceAutoConfiguration
+
   cloud:
     gateway:
       default-filters:
@@ -68,7 +78,6 @@ spring:
             - StripPrefix=0
             - name: JwtAuthFilter
 
-        # Swagger routes
         - id: auth-service-docs
           uri: ${AUTH_SERVICE_URL:http://localhost:8081}
           predicates:
@@ -156,10 +165,15 @@ springdoc:
     enabled: true
 
 jwt:
-  secret: ${JWT_SECRET:defaultSecretKey123}
+  secret: ${JWT_SECRET:u8F3nD9sK2qL1vR5bX7zW6pT4mQ0yA8e}
 
 management:
   endpoints:
     web:
       exposure:
         include: health,info,routes
+
+logging:
+  level:
+    com.steve.gateway: DEBUG
+    org.springframework.cloud.gateway: DEBUG

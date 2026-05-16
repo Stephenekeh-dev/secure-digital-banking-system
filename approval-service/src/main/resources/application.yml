@@ -6,7 +6,7 @@ spring:
     name: approval-service
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/approval_db
+    url: jdbc:postgresql://localhost:5432/bankingdb
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver

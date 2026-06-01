@@ -12,7 +12,7 @@ public class EnvConfig {
     @PostConstruct
     public void loadEnv() {
         try {
-            System.out.println("🔍 Looking for .env file...");
+            System.out.println("Looking for .env file...");
 
             // Try multiple locations
             Dotenv dotenv = null;

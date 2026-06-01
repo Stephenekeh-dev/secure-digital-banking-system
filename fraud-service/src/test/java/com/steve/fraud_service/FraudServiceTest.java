@@ -42,7 +42,7 @@ class FraudServiceTest {
                 .userId("user@bank.com")
                 .reason("Suspicious large transfer")
                 .amount(BigDecimal.valueOf(50_000))
-                .timestamp(LocalDateTime.now())
+                .flaggedAt(LocalDateTime.now())
                 .build();
 
         when(fraudRepository.save(any())).thenReturn(saved);
@@ -60,7 +60,7 @@ class FraudServiceTest {
         List<FraudActivity> activities = List.of(
                 FraudActivity.builder().id(1L).userId("user@bank.com")
                         .transactionId("TX-001").reason("Suspicious").amount(BigDecimal.TEN)
-                        .timestamp(LocalDateTime.now()).build()
+                        .flaggedAt(LocalDateTime.now()).build()
         );
         when(fraudRepository.findByUserId("user@bank.com")).thenReturn(activities);
 
@@ -75,7 +75,7 @@ class FraudServiceTest {
         List<FraudActivity> activities = List.of(
                 FraudActivity.builder().id(1L).transactionId("TX-999")
                         .userId("u1").reason("Duplicate").amount(BigDecimal.valueOf(200))
-                        .timestamp(LocalDateTime.now()).build()
+                        .flaggedAt(LocalDateTime.now()).build()
         );
         when(fraudRepository.findByTransactionId("TX-999")).thenReturn(activities);
 

@@ -1,14 +1,9 @@
-# Use JDK 17 base image
-FROM eclipse-temurin:17-jdk-alpine
-
-# Set working directory
+FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
-
-# Copy Maven/Gradle wrapper and source
-COPY . .
-
-# Package the application (assuming Maven)
-RUN ./mvnw clean package -DskipTests
-
-# Run the Spring Boot app
-ENTRYPOINT ["java", "-jar", "target/*.jar"]
+COPY target/transaction-service-0.0.1-SNAPSHOT.jar app.jar
+EXPOSE 8083
+ENTRYPOINT ["java", \
+  "-Xms40m", "-Xmx80m", \
+  "-XX:+UseContainerSupport", \
+  "-XX:+UseG1GC", \
+  "-jar", "app.jar"]

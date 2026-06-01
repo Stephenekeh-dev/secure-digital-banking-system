@@ -40,9 +40,9 @@ public class FraudConsumer {
                     .flaggedAt(LocalDateTime.now())
                     .build();
             fraudActivityRepository.save(fraud);
-            log.warn("🚨 Fraud flagged for transaction: {}", event.getTransactionId());
+            log.warn(" Fraud flagged for transaction: {}", event.getTransactionId());
         } else {
-            log.info("✅ Transaction {} passed fraud check", event.getTransactionId());
+            log.info("Transaction {} passed fraud check", event.getTransactionId());
         }
 
         // Send to approval if amount > 10,000

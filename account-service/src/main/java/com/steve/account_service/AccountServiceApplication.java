@@ -1,10 +1,15 @@
 package com.steve.account_service;
 
 import io.github.cdimascio.dotenv.Dotenv;
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
+import org.springframework.kafka.annotation.EnableKafka;
+import org.springframework.kafka.core.KafkaTemplate;
 
 @SpringBootApplication
+@EnableKafka
 public class AccountServiceApplication {
 
 	public static void main(String[] args) {
@@ -26,4 +31,5 @@ public class AccountServiceApplication {
 			System.out.println("Could not load .env file: " + e.getMessage());
 		}
 	}
+
 }

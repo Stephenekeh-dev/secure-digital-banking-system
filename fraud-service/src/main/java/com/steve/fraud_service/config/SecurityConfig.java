@@ -31,7 +31,9 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/v3/api-docs.yaml",
                                 "/swagger-resources/**",
-                                "/webjars/**"
+                                "/webjars/**",
+                                "/api/fraud/test-kafka",
+                                "/api/fraud/test-and-verify"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

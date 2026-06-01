@@ -10,10 +10,12 @@ import com.steve.auth_service.repository.UserRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -25,7 +27,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+
+import java.time.Instant;
+
 import java.util.Map;
+
+
+
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @Slf4j
 @RestController
@@ -131,5 +141,24 @@ public class AuthController {
 
         log.info("Profile picture saved: {}", destination.toAbsolutePath());
         return "/uploads/" + safeFilename;
+    }
+
+    // Testing Kafka messaging
+    @Autowired
+    private KafkaTemplate<String, String> kafkaTemplate;
+
+    @GetMapping("/test-kafka")
+    public String testKafka() {
+        kafkaTemplate.send("audit-events", "test-key", "Auth service test message at " + Instant.now());
+        return "Message sent to Kafka!";
+    }
+    @GetMapping("/test-and-verify")
+    public String testAndVerify() throws Exception {
+        // Send message and wait for acknowledgment from Kafka
+        var future = kafkaTemplate.send("audit-events", "test-key", "test");
+        var result = future.get(); // This waits for broker confirmation
+
+        return "Message confirmed! Partition: " + result.getRecordMetadata().partition() +
+                ", Offset: " + result.getRecordMetadata().offset();
     }
 }

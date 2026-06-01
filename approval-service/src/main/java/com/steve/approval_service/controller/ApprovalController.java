@@ -7,14 +7,14 @@ import com.steve.approval_service.service.ApprovalService;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.UUID;
+import java.time.Instant;
+import java.util.*;
 
 // FIX: Original was missing @RestController and @RequestMapping — endpoints were never registered
 @RestController
@@ -49,6 +49,32 @@ public class ApprovalController {
     public ResponseEntity<List<ApprovalResponse>> getApprovalsByStatus(
             @PathVariable ApprovalStatus status) {
         return ResponseEntity.ok(approvalService.getApprovalsByStatus(status));
+    }
+
+    @Autowired
+    private KafkaTemplate<String, Object> kafkaTemplate;
+
+    @GetMapping("/test-kafka")
+    public String testKafka() {
+        kafkaTemplate.send("approval-check", "test-key",
+                "Approval service test message at " + Instant.now());
+        return "Message sent to Kafka from Approval Service!";
+    }
+
+    @GetMapping("/test-and-verify")
+    public String testAndVerify() throws Exception {
+        Map<String, Object> event = new HashMap<>();
+        event.put("service", "approval-service");
+        event.put("timestamp", Instant.now().toString());
+        event.put("message", "Approval service verification test");
+        event.put("testId", System.currentTimeMillis());
+
+        var future = kafkaTemplate.send("approval-check", "test-key", event);
+        var result = future.get();
+
+        return "Message confirmed! Partition: " +
+                result.getRecordMetadata().partition() +
+                ", Offset: " + result.getRecordMetadata().offset();
     }
 
     @ExceptionHandler(NoSuchElementException.class)

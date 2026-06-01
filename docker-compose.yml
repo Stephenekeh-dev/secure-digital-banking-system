@@ -2,315 +2,233 @@ version: "3.9"
 
 services:
 
-
-  # Infrastructure
-
-
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.5.0
-    container_name: zookeeper
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-    networks:
-      - banking-net
-
-  kafka:
-    image: confluentinc/cp-kafka:7.5.0
-    container_name: kafka
-    depends_on:
-      - zookeeper
-    ports:
-      - "9092:9092"
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-    networks:
-       - banking-net
-    healthcheck:
-      test: [ "CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092" ]
-      interval: 10s
-      timeout: 10s
-      retries: 5
-
-  # ─────────────────────────────────────────
-  # Databases (one per service)
-  # ─────────────────────────────────────────
-
-  auth-postgres:
-    image: postgres:15-alpine
-    container_name: auth-postgres
-    environment:
-      POSTGRES_DB: authdb
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
-    volumes:
-      - auth-pg-data:/var/lib/postgresql/data
-    networks:
-      - banking-net
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  account-postgres:
-    image: postgres:15-alpine
-    container_name: account-postgres
-    environment:
-      POSTGRES_DB: accountdb
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
-    volumes:
-      - account-pg-data:/var/lib/postgresql/data
-    networks:
-      - banking-net
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  transaction-postgres:
-    image: postgres:15-alpine
-    container_name: transaction-postgres
-    environment:
-      POSTGRES_DB: transactiondb
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
-    volumes:
-      - transaction-pg-data:/var/lib/postgresql/data
-    networks:
-      - banking-net
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  audit-postgres:
-    image: postgres:15-alpine
-    container_name: audit-postgres
-    environment:
-      POSTGRES_DB: auditdb
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
-    volumes:
-      - audit-pg-data:/var/lib/postgresql/data
-    networks:
-      - banking-net
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  approval-postgres:
-    image: postgres:15-alpine
-    container_name: approval-postgres
-    environment:
-      POSTGRES_DB: approvaldb
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
-    volumes:
-      - approval-pg-data:/var/lib/postgresql/data
-    networks:
-      - banking-net
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  fraud-postgres:
-    image: postgres:15-alpine
-    container_name: fraud-postgres
-    environment:
-      POSTGRES_DB: frauddb
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
-    volumes:
-      - fraud-pg-data:/var/lib/postgresql/data
-    networks:
-      - banking-net
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  # ─────────────────────────────────────────
-  # Microservices
-  # ─────────────────────────────────────────
-
   gateway:
-    build: ./gateway
-    container_name: gateway
+    image: ${ECR_REGISTRY}/banking/gateway:latest
+    container_name: banking-gateway
     ports:
       - "8080:8080"
     environment:
-      JWT_SECRET: ${JWT_SECRET:-u8F3nD9sK2qL1vR5bX7zW6pT4mQ0yA8e}
-      AUTH_SERVICE_URL: http://auth-service:8081
-      ACCOUNT_SERVICE_URL: http://account-service:8082
-      TRANSACTION_SERVICE_URL: http://transaction-service:8083
-      NOTIFICATION_SERVICE_URL: http://notification-service:8084
-      AUDIT_SERVICE_URL: http://audit-service:8085
-      FRAUD_SERVICE_URL: http://fraud-service:8086
-      APPROVAL_SERVICE_URL: http://approval-service:8087
+      JWT_SECRET: ${JWT_SECRET}
+      AUTH_SERVICE_URL: http://banking-auth:8081
+      ACCOUNT_SERVICE_URL: http://banking-account:8082
+      TRANSACTION_SERVICE_URL: http://banking-transaction:8083
+      NOTIFICATION_SERVICE_URL: http://banking-notification:8084
+      AUDIT_SERVICE_URL: http://banking-audit:8085
+      FRAUD_SERVICE_URL: http://banking-fraud:8086
+      APPROVAL_SERVICE_URL: http://banking-approval:8087
     depends_on:
       - auth-service
-      - account-service
-      - transaction-service
     networks:
-      - banking-net
+      - banking-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-",
+             "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   auth-service:
-    build: ./auth-service
-    container_name: auth-service
+    image: ${ECR_REGISTRY}/banking/auth-service:latest
+    container_name: banking-auth
     ports:
       - "8081:8081"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://auth-postgres:5432/authdb
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-changeme}
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      JWT_SECRET: ${JWT_SECRET:-u8F3nD9sK2qL1vR5bX7zW6pT4mQ0yA8e}
-      FILE_UPLOAD_DIR: /app/uploads/
+      SPRING_DATASOURCE_URL: ${DB_URL}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+      SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL: SSL
+      SPRING_KAFKA_PROPERTIES_SSL_KEYSTORE_TYPE: PKCS12
+      SPRING_KAFKA_PROPERTIES_SSL_KEYSTORE_LOCATION: /app/config/keystore.p12
+      SPRING_KAFKA_PROPERTIES_SSL_KEYSTORE_PASSWORD: ${KAFKA_SSL_KEYSTORE_PASSWORD}
+      SPRING_KAFKA_PROPERTIES_SSL_KEY_PASSWORD: ${KAFKA_SSL_KEY_PASSWORD}
+      SPRING_KAFKA_PROPERTIES_SSL_TRUSTSTORE_TYPE: JKS
+      SPRING_KAFKA_PROPERTIES_SSL_TRUSTSTORE_LOCATION: /app/config/client.truststore.jks
+      SPRING_KAFKA_PROPERTIES_SSL_TRUSTSTORE_PASSWORD: ${KAFKA_SSL_TRUSTSTORE_PASSWORD}
+      SPRING_KAFKA_PROPERTIES_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ""
+      JWT_SECRET: ${JWT_SECRET}
+      SPRING_MAIL_HOST: ${MAIL_HOST}
+      SPRING_MAIL_PORT: ${MAIL_PORT}
+      SPRING_MAIL_USERNAME: ${MAIL_USERNAME}
+      SPRING_MAIL_PASSWORD: ${MAIL_PASSWORD}
+      AWS_ACCESS_KEY: ${AWS_ACCESS_KEY}
+      AWS_SECRET_KEY: ${AWS_SECRET_KEY}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      AWS_S3_FOLDER: ${AWS_S3_FOLDER}
+      AWS_REGION: ${AWS_REGION}
     volumes:
-      - upload-data:/app/uploads
-    depends_on:
-      auth-postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
+      - /home/ubuntu/banking-system/config:/app/config:ro
     networks:
-      - banking-net
+      - banking-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-",
+             "http://localhost:8081/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   account-service:
-    build: ./account-service
-    container_name: account-service
+    image: ${ECR_REGISTRY}/banking/account-service:latest
+    container_name: banking-account
     ports:
       - "8082:8082"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://account-postgres:5432/accountdb
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-changeme}
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      JWT_SECRET: ${JWT_SECRET:-u8F3nD9sK2qL1vR5bX7zW6pT4mQ0yA8e}
-    depends_on:
-      account-postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
+      SPRING_DATASOURCE_URL: ${DB_URL}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+      SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL: SSL
+      SPRING_KAFKA_PROPERTIES_SSL_KEYSTORE_TYPE: PKCS12
+      SPRING_KAFKA_PROPERTIES_SSL_KEYSTORE_LOCATION: /app/config/keystore.p12
+      SPRING_KAFKA_PROPERTIES_SSL_KEYSTORE_PASSWORD: ${KAFKA_SSL_KEYSTORE_PASSWORD}
+      SPRING_KAFKA_PROPERTIES_SSL_KEY_PASSWORD: ${KAFKA_SSL_KEY_PASSWORD}
+      SPRING_KAFKA_PROPERTIES_SSL_TRUSTSTORE_TYPE: JKS
+      SPRING_KAFKA_PROPERTIES_SSL_TRUSTSTORE_LOCATION: /app/config/client.truststore.jks
+      SPRING_KAFKA_PROPERTIES_SSL_TRUSTSTORE_PASSWORD: ${KAFKA_SSL_TRUSTSTORE_PASSWORD}
+      SPRING_KAFKA_PROPERTIES_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ""
+      JWT_SECRET: ${JWT_SECRET}
+    volumes:
+      - /home/ubuntu/banking-system/config:/app/config:ro
     networks:
-      - banking-net
+      - banking-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-",
+             "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   transaction-service:
-    build: ./transaction-service
-    container_name: transaction-service
+    image: ${ECR_REGISTRY}/banking/transaction-service:latest
+    container_name: banking-transaction
     ports:
       - "8083:8083"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://transaction-postgres:5432/transactiondb
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-changeme}
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      JWT_SECRET: ${JWT_SECRET:-u8F3nD9sK2qL1vR5bX7zW6pT4mQ0yA8e}
-    depends_on:
-      transaction-postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
+      SPRING_DATASOURCE_URL: ${DB_URL}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+      SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL: SSL
+      SPRING_KAFKA_PROPERTIES_SSL_KEYSTORE_TYPE: PKCS12
+      SPRING_KAFKA_PROPERTIES_SSL_KEYSTORE_LOCATION: /app/config/keystore.p12
+      SPRING_KAFKA_PROPERTIES_SSL_KEYSTORE_PASSWORD: ${KAFKA_SSL_KEYSTORE_PASSWORD}
+      SPRING_KAFKA_PROPERTIES_SSL_KEY_PASSWORD: ${KAFKA_SSL_KEY_PASSWORD}
+      SPRING_KAFKA_PROPERTIES_SSL_TRUSTSTORE_TYPE: JKS
+      SPRING_KAFKA_PROPERTIES_SSL_TRUSTSTORE_LOCATION: /app/config/client.truststore.jks
+      SPRING_KAFKA_PROPERTIES_SSL_TRUSTSTORE_PASSWORD: ${KAFKA_SSL_TRUSTSTORE_PASSWORD}
+      SPRING_KAFKA_PROPERTIES_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ""
+      JWT_SECRET: ${JWT_SECRET}
+    volumes:
+      - /home/ubuntu/banking-system/config:/app/config:ro
     networks:
-      - banking-net
+      - banking-network
+    restart: unless-stopped
 
   notification-service:
-    build: ./notification-service
-    container_name: notification-service
+    image: ${ECR_REGISTRY}/banking/notification-service:latest
+    container_name: banking-notification
     ports:
       - "8084:8084"
     environment:
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
-      MAIL_PORT: ${MAIL_PORT:-587}
-      MAIL_USERNAME: ${MAIL_USERNAME:-}
-      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
-    depends_on:
-      kafka:
-        condition: service_healthy
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+      SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL: SSL
+      SPRING_KAFKA_PROPERTIES_SSL_KEYSTORE_TYPE: PKCS12
+      SPRING_KAFKA_PROPERTIES_SSL_KEYSTORE_LOCATION: /app/config/keystore.p12
+      SPRING_KAFKA_PROPERTIES_SSL_KEYSTORE_PASSWORD: ${KAFKA_SSL_KEYSTORE_PASSWORD}
+      SPRING_KAFKA_PROPERTIES_SSL_KEY_PASSWORD: ${KAFKA_SSL_KEY_PASSWORD}
+      SPRING_KAFKA_PROPERTIES_SSL_TRUSTSTORE_TYPE: JKS
+      SPRING_KAFKA_PROPERTIES_SSL_TRUSTSTORE_LOCATION: /app/config/client.truststore.jks
+      SPRING_KAFKA_PROPERTIES_SSL_TRUSTSTORE_PASSWORD: ${KAFKA_SSL_TRUSTSTORE_PASSWORD}
+      SPRING_KAFKA_PROPERTIES_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ""
+      SPRING_MAIL_HOST: ${MAIL_HOST}
+      SPRING_MAIL_PORT: ${MAIL_PORT}
+      SPRING_MAIL_USERNAME: ${MAIL_USERNAME}
+      SPRING_MAIL_PASSWORD: ${MAIL_PASSWORD}
+    volumes:
+      - /home/ubuntu/banking-system/config:/app/config:ro
     networks:
-      - banking-net
+      - banking-network
+    restart: unless-stopped
 
   audit-service:
-    build: ./audit-service
-    container_name: audit-service
+    image: ${ECR_REGISTRY}/banking/audit-service:latest
+    container_name: banking-audit
     ports:
       - "8085:8085"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://audit-postgres:5432/auditdb
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-changeme}
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-    depends_on:
-      audit-postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
+      SPRING_DATASOURCE_URL: ${DB_URL}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+      SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL: SSL
+      SPRING_KAFKA_PROPERTIES_SSL_KEYSTORE_TYPE: PKCS12
+      SPRING_KAFKA_PROPERTIES_SSL_KEYSTORE_LOCATION: /app/config/keystore.p12
+      SPRING_KAFKA_PROPERTIES_SSL_KEYSTORE_PASSWORD: ${KAFKA_SSL_KEYSTORE_PASSWORD}
+      SPRING_KAFKA_PROPERTIES_SSL_KEY_PASSWORD: ${KAFKA_SSL_KEY_PASSWORD}
+      SPRING_KAFKA_PROPERTIES_SSL_TRUSTSTORE_TYPE: JKS
+      SPRING_KAFKA_PROPERTIES_SSL_TRUSTSTORE_LOCATION: /app/config/client.truststore.jks
+      SPRING_KAFKA_PROPERTIES_SSL_TRUSTSTORE_PASSWORD: ${KAFKA_SSL_TRUSTSTORE_PASSWORD}
+      SPRING_KAFKA_PROPERTIES_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ""
+    volumes:
+      - /home/ubuntu/banking-system/config:/app/config:ro
+      - /home/ubuntu/banking-system/uploads:/app/uploads
     networks:
-      - banking-net
+      - banking-network
+    restart: unless-stopped
 
   fraud-service:
-    build: ./fraud-service
-    container_name: fraud-service
+    image: ${ECR_REGISTRY}/banking/fraud-service:latest
+    container_name: banking-fraud
     ports:
       - "8086:8086"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://fraud-postgres:5432/frauddb
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-changeme}
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      JWT_SECRET: ${JWT_SECRET:-u8F3nD9sK2qL1vR5bX7zW6pT4mQ0yA8e}
-    depends_on:
-      fraud-postgres:
-        condition: service_healthy
-      kafka:
-        condition: service_healthy
+      SPRING_DATASOURCE_URL: ${DB_URL}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+      SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL: SSL
+      SPRING_KAFKA_PROPERTIES_SSL_KEYSTORE_TYPE: PKCS12
+      SPRING_KAFKA_PROPERTIES_SSL_KEYSTORE_LOCATION: /app/config/keystore.p12
+      SPRING_KAFKA_PROPERTIES_SSL_KEYSTORE_PASSWORD: ${KAFKA_SSL_KEYSTORE_PASSWORD}
+      SPRING_KAFKA_PROPERTIES_SSL_KEY_PASSWORD: ${KAFKA_SSL_KEY_PASSWORD}
+      SPRING_KAFKA_PROPERTIES_SSL_TRUSTSTORE_TYPE: JKS
+      SPRING_KAFKA_PROPERTIES_SSL_TRUSTSTORE_LOCATION: /app/config/client.truststore.jks
+      SPRING_KAFKA_PROPERTIES_SSL_TRUSTSTORE_PASSWORD: ${KAFKA_SSL_TRUSTSTORE_PASSWORD}
+      SPRING_KAFKA_PROPERTIES_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ""
+    volumes:
+      - /home/ubuntu/banking-system/config:/app/config:ro
     networks:
-      - banking-net
+      - banking-network
+    restart: unless-stopped
 
   approval-service:
-    build: ./approval-service
-    container_name: approval-service
+    image: ${ECR_REGISTRY}/banking/approval-service:latest
+    container_name: banking-approval
     ports:
       - "8087:8087"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://approval-postgres:5432/approvaldb
-      SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-changeme}
-      JWT_SECRET: ${JWT_SECRET:-u8F3nD9sK2qL1vR5bX7zW6pT4mQ0yA8e}
-    depends_on:
-      approval-postgres:
-        condition: service_healthy
+      SPRING_DATASOURCE_URL: ${DB_URL}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS}
+      SPRING_KAFKA_PROPERTIES_SECURITY_PROTOCOL: SSL
+      SPRING_KAFKA_PROPERTIES_SSL_KEYSTORE_TYPE: PKCS12
+      SPRING_KAFKA_PROPERTIES_SSL_KEYSTORE_LOCATION: /app/config/keystore.p12
+      SPRING_KAFKA_PROPERTIES_SSL_KEYSTORE_PASSWORD: ${KAFKA_SSL_KEYSTORE_PASSWORD}
+      SPRING_KAFKA_PROPERTIES_SSL_KEY_PASSWORD: ${KAFKA_SSL_KEY_PASSWORD}
+      SPRING_KAFKA_PROPERTIES_SSL_TRUSTSTORE_TYPE: JKS
+      SPRING_KAFKA_PROPERTIES_SSL_TRUSTSTORE_LOCATION: /app/config/client.truststore.jks
+      SPRING_KAFKA_PROPERTIES_SSL_TRUSTSTORE_PASSWORD: ${KAFKA_SSL_TRUSTSTORE_PASSWORD}
+      SPRING_KAFKA_PROPERTIES_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ""
+    volumes:
+      - /home/ubuntu/banking-system/config:/app/config:ro
     networks:
-      - banking-net
-
-# ─────────────────────────────────────────
-# Networks & Volumes
-# ─────────────────────────────────────────
+      - banking-network
+    restart: unless-stopped
 
 networks:
-  banking-net:
+  banking-network:
     driver: bridge
-
-volumes:
-  auth-pg-data:
-  account-pg-data:
-  transaction-pg-data:
-  audit-pg-data:
-  approval-pg-data:
-  fraud-pg-data:
-  upload-data:

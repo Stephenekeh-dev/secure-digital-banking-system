@@ -5,11 +5,15 @@ import com.steve.fraud_service.service.FraudService;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -65,5 +69,31 @@ public class FraudController {
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleBadRequest(IllegalArgumentException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+    }
+
+    @Autowired
+    private KafkaTemplate<String, Object> kafkaTemplate;
+
+    @GetMapping("/test-kafka")
+    public String testKafka() {
+        kafkaTemplate.send("audit-events", "test-key",
+                "Fraud service test message at " + Instant.now());
+        return "Message sent to Kafka from Fraud Service!";
+    }
+
+    @GetMapping("/test-and-verify")
+    public String testAndVerify() throws Exception {
+        Map<String, Object> event = new HashMap<>();
+        event.put("service", "fraud-service");
+        event.put("timestamp", Instant.now().toString());
+        event.put("message", "Fraud service verification test");
+        event.put("testId", System.currentTimeMillis());
+
+        var future = kafkaTemplate.send("audit-events", "test-key", event);
+        var result = future.get();
+
+        return "Message confirmed from Fraud Service! Partition: " +
+                result.getRecordMetadata().partition() +
+                ", Offset: " + result.getRecordMetadata().offset();
     }
 }

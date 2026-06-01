@@ -6,10 +6,16 @@ spring:
     name: fraud-service
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/bankingdb
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      minimum-idle: 1
+      maximum-pool-size: 3
+      idle-timeout: 300000
+      connection-timeout: 20000
+      max-lifetime: 1200000
 
   jpa:
     hibernate:
@@ -20,38 +26,33 @@ spring:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
-
   kafka:
-    bootstrap-servers: localhost:9092
-    consumer:
-      group-id: fraud-service-group
-      auto-offset-reset: earliest
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
-      properties:
-        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
-        spring.json.trusted.packages: "*"
-        spring.json.use.type.headers: false
-        spring.json.value.default.type: com.steve.fraud_service.kafka.FraudCheckEvent
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    properties:
+      security.protocol: ${KAFKA_SECURITY_PROTOCOL}
+      ssl.keystore.type: ${KAFKA_SSL_KEYSTORE_TYPE}
+      ssl.keystore.location: ${KAFKA_SSL_KEYSTORE_LOCATION}
+      ssl.keystore.password: ${KAFKA_SSL_KEYSTORE_PASSWORD}
+      ssl.key.password: ${KAFKA_SSL_KEY_PASSWORD}
+      ssl.truststore.type: ${KAFKA_SSL_TRUSTSTORE_TYPE}
+      ssl.truststore.location: ${KAFKA_SSL_TRUSTSTORE_LOCATION}
+      ssl.truststore.password: ${KAFKA_SSL_TRUSTSTORE_PASSWORD}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       properties:
         spring.json.add.type.headers: false
+    consumer:
+      group-id: fraud-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+        spring.json.use.type.headers: false
 
 jwt:
   secret: ${JWT_SECRET}
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
-
-logging:
-  level:
-    root: INFO
-    org.hibernate.SQL: DEBUG
 
 springdoc:
   api-docs:

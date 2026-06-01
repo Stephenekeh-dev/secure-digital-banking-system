@@ -5,13 +5,17 @@ spring:
   application:
     name: account-service
 
-
-
   datasource:
-    url: jdbc:postgresql://localhost:5432/accountdb
+    url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      minimum-idle: 1
+      maximum-pool-size: 3
+      idle-timeout: 300000
+      connection-timeout: 20000
+      max-lifetime: 1200000
 
   jpa:
     hibernate:
@@ -23,24 +27,35 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
   kafka:
-    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    properties:
+      security.protocol: ${KAFKA_SECURITY_PROTOCOL}
+      ssl.keystore.type: ${KAFKA_SSL_KEYSTORE_TYPE}
+      ssl.keystore.location: ${KAFKA_SSL_KEYSTORE_LOCATION}
+      ssl.keystore.password: ${KAFKA_SSL_KEYSTORE_PASSWORD}
+      ssl.key.password: ${KAFKA_SSL_KEY_PASSWORD}
+      ssl.truststore.type: ${KAFKA_SSL_TRUSTSTORE_TYPE}
+      ssl.truststore.location: ${KAFKA_SSL_TRUSTSTORE_LOCATION}
+      ssl.truststore.password: ${KAFKA_SSL_TRUSTSTORE_PASSWORD}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+    consumer:
+      group-id: account-service-group
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+        spring.json.use.type.headers: false
+    listener:
+      ack-mode: manual
 
 jwt:
   secret: ${JWT_SECRET}
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
-
-logging:
-  level:
-    org.springframework.security: DEBUG
-    com.steve.account_service: DEBUG
 
 springdoc:
   api-docs:

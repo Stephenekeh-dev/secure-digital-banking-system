@@ -25,7 +25,6 @@ public class S3FileUploadService {
 
     @Value("${AWS_S3_FOLDER:banking-uploads}")
     private String folder;
-
     public S3FileUploadService(S3Client s3Client) {
         this.s3Client = s3Client;
     }

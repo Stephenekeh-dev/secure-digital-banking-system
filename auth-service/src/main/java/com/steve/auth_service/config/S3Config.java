@@ -20,7 +20,6 @@ public class S3Config {
     @Value("${AWS_REGION:us-east-1}")  // ← use env var directly
     private String region;
 
-
     @Bean
     public S3Client s3Client() {
         return S3Client.builder()

@@ -11,14 +11,15 @@ import software.amazon.awssdk.services.s3.S3Client;
 @Configuration
 public class S3Config {
 
-    @Value("${aws.credentials.access-key}")
+    @Value("${AWS_ACCESS_KEY}")        // ← use env var directly
     private String accessKey;
 
-    @Value("${aws.credentials.secret-key}")
+    @Value("${AWS_SECRET_KEY}")        // ← use env var directly
     private String secretKey;
 
-    @Value("${aws.region}")
+    @Value("${AWS_REGION:us-east-1}")  // ← use env var directly
     private String region;
+
 
     @Bean
     public S3Client s3Client() {

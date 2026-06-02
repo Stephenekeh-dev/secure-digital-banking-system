@@ -11,7 +11,7 @@ env:
   ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
 
 jobs:
-  # ─── Job 1: Build ────────────────────────────────────────────────────
+  # Job 1: Build
   build:
     name: Build Services
     runs-on: ubuntu-latest
@@ -54,7 +54,7 @@ jobs:
             */target/*.jar
           retention-days: 1
 
-  # ─── Job 2: Docker Build and Push ────────────────────────────────────
+  #   Job 2: Docker Build and Push
   docker:
     name: Build and Push Docker Images
     runs-on: ubuntu-latest
@@ -153,10 +153,10 @@ jobs:
               ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
 
             # Pull latest images
-            docker-compose pull
+            docker compose pull
 
             # Deploy with zero downtime
-            docker-compose up -d --remove-orphans
+            docker compose up -d --remove-orphans
 
             # Clean up old images
             docker image prune -f
@@ -170,8 +170,16 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            echo "Waiting for services to start..."
-            sleep 40
+            cd /home/ubuntu/banking-system
+
+            echo "Waiting 90 seconds for all services to start..."
+            sleep 90
+
+            echo "Checking container status..."
+            docker compose ps
+
+            echo "Checking logs for errors..."
+            docker compose logs --tail=20
 
             # Check each service health
             services=(
@@ -190,19 +198,22 @@ jobs:
               port="${entry%%:*}"
               name="${entry##*:}"
               response=$(curl -s -o /dev/null -w "%{http_code}" \
+                --max-time 10 \
                 http://localhost:$port/actuator/health)
               if [ "$response" = "200" ]; then
-                echo "$name is healthy"
+                echo "✅ $name is healthy"
               else
-                echo "$name health check failed (HTTP $response)"
+                echo "❌ $name health check failed (HTTP $response)"
+                echo "--- $name logs ---"
+                docker compose logs --tail=30 $name 2>/dev/null || true
                 all_healthy=false
               fi
             done
 
             if [ "$all_healthy" = true ]; then
-              echo " All services are healthy!"
+              echo "✅ All services are healthy!"
             else
-              echo "Some services failed health check"
-              docker-compose ps
+              echo "⚠️ Some services failed health check"
+              docker compose ps
               exit 1
             fi

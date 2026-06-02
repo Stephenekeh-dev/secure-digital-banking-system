@@ -61,3 +61,12 @@ springdoc:
     path: /swagger-ui.html
     try-it-out-enabled: true
     operations-sorter: method
+
+aws:
+  credentials:
+    access-key: ${AWS_ACCESS_KEY}
+    secret-key: ${AWS_SECRET_KEY}
+  s3:
+    bucket: ${AWS_S3_BUCKET}
+    folder: ${AWS_S3_FOLDER:banking-uploads}
+  region: ${AWS_REGION:us-east-1}

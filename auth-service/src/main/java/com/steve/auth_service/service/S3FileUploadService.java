@@ -17,11 +17,14 @@ public class S3FileUploadService {
 
     private final S3Client s3Client;
 
-    @Value("${aws.s3.bucket}")
+    @Value("${AWS_S3_BUCKET}")
     private String bucketName;
 
-    @Value("${aws.region}")
+    @Value("${AWS_REGION:us-east-1}")
     private String region;
+
+    @Value("${AWS_S3_FOLDER:banking-uploads}")
+    private String folder;
 
     public S3FileUploadService(S3Client s3Client) {
         this.s3Client = s3Client;

@@ -102,23 +102,6 @@ jobs:
           done
 
   # ─── Job 3: Deploy to EC2 ─────────────────────────────────────────────
-  deploy:
-    name: Deploy to EC2
-    runs-on: ubuntu-latest
-    needs: docker
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Copy docker-compose to EC2
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: "docker-compose.yml"
-          target: "/home/ubuntu/banking-system"
-
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -127,41 +110,62 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/banking-system
-
+            
             # Create .env file from GitHub secrets
-            cat > .env << EOF
+            cat > .env << 'ENVEOF'
             DB_URL=${{ secrets.DB_URL }}
             DB_USERNAME=${{ secrets.DB_USERNAME }}
             DB_PASSWORD=${{ secrets.DB_PASSWORD }}
             KAFKA_BOOTSTRAP_SERVERS=${{ secrets.KAFKA_BOOTSTRAP_SERVERS }}
-            KAFKA_USERNAME=${{ secrets.KAFKA_USERNAME }}
-            KAFKA_PASSWORD=${{ secrets.KAFKA_PASSWORD }}
+            KAFKA_SECURITY_PROTOCOL=SSL
+            KAFKA_SSL_KEYSTORE_TYPE=PKCS12
+            KAFKA_SSL_KEYSTORE_LOCATION=/home/ubuntu/banking-system/config/keystore.p12
+            KAFKA_SSL_KEYSTORE_PASSWORD=${{ secrets.KAFKA_SSL_KEYSTORE_PASSWORD }}
+            KAFKA_SSL_KEY_PASSWORD=${{ secrets.KAFKA_SSL_KEY_PASSWORD }}
+            KAFKA_SSL_TRUSTSTORE_TYPE=JKS
+            KAFKA_SSL_TRUSTSTORE_LOCATION=/home/ubuntu/banking-system/config/client.truststore.jks
+            KAFKA_SSL_TRUSTSTORE_PASSWORD=${{ secrets.KAFKA_SSL_TRUSTSTORE_PASSWORD }}
             JWT_SECRET=${{ secrets.JWT_SECRET }}
+            MAIL_HOST=${{ secrets.MAIL_HOST }}
+            MAIL_PORT=${{ secrets.MAIL_PORT }}
             MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
             MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
+            AUTH_SERVICE_URL=http://banking-auth:8081
+            ACCOUNT_SERVICE_URL=http://banking-account:8082
+            TRANSACTION_SERVICE_URL=http://banking-transaction:8083
+            NOTIFICATION_SERVICE_URL=http://banking-notification:8084
+            AUDIT_SERVICE_URL=http://banking-audit:8085
+            FRAUD_SERVICE_URL=http://banking-fraud:8086
+            APPROVAL_SERVICE_URL=http://banking-approval:8087
             AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY_ID }}
             AWS_SECRET_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
             AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }}
+            AWS_S3_FOLDER=${{ secrets.AWS_S3_FOLDER }}
             AWS_REGION=us-east-1
+            FILE_UPLOAD_DIR=/home/ubuntu/banking-system/uploads
             ECR_REGISTRY=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
-            EOF
-
+            ENVEOF
+            
+            # Create uploads directory
+            mkdir -p /home/ubuntu/banking-system/uploads
+            
             # Login to ECR
             aws ecr get-login-password --region us-east-1 | \
-              docker login --username AWS \
-              --password-stdin \
-              ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
-
+            docker login --username AWS \
+            --password-stdin \
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+            
             # Pull latest images
             docker compose pull
-
-            # Deploy with zero downtime
-            docker compose up -d --remove-orphans
-
-            # Clean up old images
+            
+            # Stop and restart all services
+            docker compose down --remove-orphans || true
+            docker compose up -d
+            
+            # Clean up
             docker image prune -f
-
-            echo "Deployment completed"
+            
+            echo "✅ Deployment completed"
 
       - name: Health Check
         uses: appleboy/ssh-action@v1.0.3

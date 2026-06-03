@@ -4,14 +4,14 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:    # allows manual trigger
+  workflow_dispatch:
 
 env:
   AWS_REGION: us-east-1
   ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
 
 jobs:
-  # Job 1: Build
+  # ─── Job 1: Build ────────────────────────────────────────────────────
   build:
     name: Build Services
     runs-on: ubuntu-latest
@@ -54,7 +54,7 @@ jobs:
             */target/*.jar
           retention-days: 1
 
-  #   Job 2: Docker Build and Push
+  # ─── Job 2: Docker Build and Push ────────────────────────────────────
   docker:
     name: Build and Push Docker Images
     runs-on: ubuntu-latest
@@ -125,26 +125,51 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
+          timeout: 30m
+          command_timeout: 30m
           script: |
             cd /home/ubuntu/banking-system
 
-            # Create .env file from GitHub secrets
-            cat > .env << EOF
+            # Create .env file with ALL required variables
+            cat > .env << 'ENVEOF'
             DB_URL=${{ secrets.DB_URL }}
             DB_USERNAME=${{ secrets.DB_USERNAME }}
             DB_PASSWORD=${{ secrets.DB_PASSWORD }}
             KAFKA_BOOTSTRAP_SERVERS=${{ secrets.KAFKA_BOOTSTRAP_SERVERS }}
-            KAFKA_USERNAME=${{ secrets.KAFKA_USERNAME }}
-            KAFKA_PASSWORD=${{ secrets.KAFKA_PASSWORD }}
+            KAFKA_SECURITY_PROTOCOL=SSL
+            KAFKA_SSL_KEYSTORE_TYPE=PKCS12
+            KAFKA_SSL_KEYSTORE_LOCATION=/home/ubuntu/banking-system/config/keystore.p12
+            KAFKA_SSL_KEYSTORE_PASSWORD=${{ secrets.KAFKA_SSL_KEYSTORE_PASSWORD }}
+            KAFKA_SSL_KEY_PASSWORD=${{ secrets.KAFKA_SSL_KEY_PASSWORD }}
+            KAFKA_SSL_TRUSTSTORE_TYPE=JKS
+            KAFKA_SSL_TRUSTSTORE_LOCATION=/home/ubuntu/banking-system/config/client.truststore.jks
+            KAFKA_SSL_TRUSTSTORE_PASSWORD=${{ secrets.KAFKA_SSL_TRUSTSTORE_PASSWORD }}
             JWT_SECRET=${{ secrets.JWT_SECRET }}
+            MAIL_HOST=${{ secrets.MAIL_HOST }}
+            MAIL_PORT=${{ secrets.MAIL_PORT }}
             MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
             MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
+            AUTH_SERVICE_URL=http://banking-auth:8081
+            ACCOUNT_SERVICE_URL=http://banking-account:8082
+            TRANSACTION_SERVICE_URL=http://banking-transaction:8083
+            NOTIFICATION_SERVICE_URL=http://banking-notification:8084
+            AUDIT_SERVICE_URL=http://banking-audit:8085
+            FRAUD_SERVICE_URL=http://banking-fraud:8086
+            APPROVAL_SERVICE_URL=http://banking-approval:8087
             AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY_ID }}
             AWS_SECRET_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
             AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }}
+            AWS_S3_FOLDER=${{ secrets.AWS_S3_FOLDER }}
             AWS_REGION=us-east-1
+            FILE_UPLOAD_DIR=/home/ubuntu/banking-system/uploads
             ECR_REGISTRY=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
-            EOF
+            ENVEOF
+
+            # Create uploads directory
+            mkdir -p /home/ubuntu/banking-system/uploads
+
+            # Verify .env was created
+            echo "✅ .env file created with $(wc -l < .env) lines"
 
             # Login to ECR
             aws ecr get-login-password --region us-east-1 | \
@@ -152,16 +177,36 @@ jobs:
               --password-stdin \
               ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
 
-            # Pull latest images
-            docker compose pull
+            echo "✅ ECR login successful"
 
-            # Deploy with zero downtime
-            docker compose up -d --remove-orphans
+            # Pull latest images one by one to avoid timeout
+            services=(
+              "banking/gateway"
+              "banking/auth-service"
+              "banking/account-service"
+              "banking/transaction-service"
+              "banking/notification-service"
+              "banking/audit-service"
+              "banking/fraud-service"
+              "banking/approval-service"
+            )
 
-            # Clean up old images
+            for service in "${services[@]}"; do
+              echo "Pulling $service..."
+              docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/$service:latest
+              echo "✅ $service pulled"
+            done
+
+            # Stop old containers
+            docker compose down --remove-orphans || true
+
+            # Start all services
+            docker compose up -d
+
+            # Clean up
             docker image prune -f
 
-            echo "Deployment completed"
+            echo "✅ Deployment completed"
 
       - name: Health Check
         uses: appleboy/ssh-action@v1.0.3
@@ -169,6 +214,8 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
+          timeout: 30m
+          command_timeout: 30m
           script: |
             cd /home/ubuntu/banking-system
 
@@ -178,7 +225,6 @@ jobs:
             echo "Container status:"
             docker compose ps
 
-            # Check each service health with retries
             services=(
               "8090:gateway"
               "8081:auth-service"
@@ -195,7 +241,6 @@ jobs:
               port="${entry%%:*}"
               name="${entry##*:}"
 
-              # Retry up to 5 times
               success=false
               for i in 1 2 3 4 5; do
                 response=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -206,7 +251,7 @@ jobs:
                   success=true
                   break
                 else
-                  echo "⏳ $name attempt $i failed (HTTP $response) - retrying in 30s..."
+                  echo "⏳ $name attempt $i (HTTP $response) retrying in 30s..."
                   sleep 30
                 fi
               done

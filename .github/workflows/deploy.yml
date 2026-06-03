@@ -102,23 +102,6 @@ jobs:
           done
 
   # ─── Job 3: Deploy to EC2 ─────────────────────────────────────────────
-  deploy:
-    name: Deploy to EC2
-    runs-on: ubuntu-latest
-    needs: docker
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Copy docker-compose to EC2
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: "docker-compose.yml"
-          target: "/home/ubuntu/banking-system"
-
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -127,42 +110,62 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu/banking-system
-
+            
             # Create .env file from GitHub secrets
-            cat > .env << EOF
+            cat > .env << 'ENVEOF'
             DB_URL=${{ secrets.DB_URL }}
             DB_USERNAME=${{ secrets.DB_USERNAME }}
             DB_PASSWORD=${{ secrets.DB_PASSWORD }}
             KAFKA_BOOTSTRAP_SERVERS=${{ secrets.KAFKA_BOOTSTRAP_SERVERS }}
-            KAFKA_USERNAME=${{ secrets.KAFKA_USERNAME }}
-            KAFKA_PASSWORD=${{ secrets.KAFKA_PASSWORD }}
+            KAFKA_SECURITY_PROTOCOL=SSL
+            KAFKA_SSL_KEYSTORE_TYPE=PKCS12
+            KAFKA_SSL_KEYSTORE_LOCATION=/home/ubuntu/banking-system/config/keystore.p12
+            KAFKA_SSL_KEYSTORE_PASSWORD=${{ secrets.KAFKA_SSL_KEYSTORE_PASSWORD }}
+            KAFKA_SSL_KEY_PASSWORD=${{ secrets.KAFKA_SSL_KEY_PASSWORD }}
+            KAFKA_SSL_TRUSTSTORE_TYPE=JKS
+            KAFKA_SSL_TRUSTSTORE_LOCATION=/home/ubuntu/banking-system/config/client.truststore.jks
+            KAFKA_SSL_TRUSTSTORE_PASSWORD=${{ secrets.KAFKA_SSL_TRUSTSTORE_PASSWORD }}
             JWT_SECRET=${{ secrets.JWT_SECRET }}
+            MAIL_HOST=${{ secrets.MAIL_HOST }}
+            MAIL_PORT=${{ secrets.MAIL_PORT }}
             MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
             MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
+            AUTH_SERVICE_URL=http://banking-auth:8081
+            ACCOUNT_SERVICE_URL=http://banking-account:8082
+            TRANSACTION_SERVICE_URL=http://banking-transaction:8083
+            NOTIFICATION_SERVICE_URL=http://banking-notification:8084
+            AUDIT_SERVICE_URL=http://banking-audit:8085
+            FRAUD_SERVICE_URL=http://banking-fraud:8086
+            APPROVAL_SERVICE_URL=http://banking-approval:8087
             AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY_ID }}
             AWS_SECRET_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
             AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }}
+            AWS_S3_FOLDER=${{ secrets.AWS_S3_FOLDER }}
             AWS_REGION=us-east-1
+            FILE_UPLOAD_DIR=/home/ubuntu/banking-system/uploads
             ECR_REGISTRY=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
-            EOF
-
+            ENVEOF
+            
+            # Create uploads directory
+            mkdir -p /home/ubuntu/banking-system/uploads
+            
             # Login to ECR
             aws ecr get-login-password --region us-east-1 | \
-              docker login --username AWS \
-              --password-stdin \
-              ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
-
+            docker login --username AWS \
+            --password-stdin \
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+            
             # Pull latest images
             docker compose pull
-
-            # Deploy with zero downtime
-            docker compose up -d --remove-orphans
-
-            # Clean up old images
+            
+            # Stop and restart all services
+            docker compose down --remove-orphans || true
+            docker compose up -d
+            
+            # Clean up
             docker image prune -f
-
-            echo "Deployment completed"
-
+            
+            echo "✅ Deployment completed"
       - name: Health Check
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -172,18 +175,15 @@ jobs:
           script: |
             cd /home/ubuntu/banking-system
 
-            echo "Waiting 90 seconds for all services to start..."
-            sleep 90
+            echo "Waiting 5 minutes for all services to start..."
+            sleep 300
 
-            echo "Checking container status..."
+            echo "Container status:"
             docker compose ps
 
-            echo "Checking logs for errors..."
-            docker compose logs --tail=20
-
-            # Check each service health
+            # Check each service health with retries
             services=(
-              "8080:gateway"
+              "8090:gateway"
               "8081:auth-service"
               "8082:account-service"
               "8083:transaction-service"
@@ -197,15 +197,26 @@ jobs:
             for entry in "${services[@]}"; do
               port="${entry%%:*}"
               name="${entry##*:}"
-              response=$(curl -s -o /dev/null -w "%{http_code}" \
-                --max-time 10 \
-                http://localhost:$port/actuator/health)
-              if [ "$response" = "200" ]; then
-                echo "✅ $name is healthy"
-              else
-                echo "❌ $name health check failed (HTTP $response)"
-                echo "--- $name logs ---"
-                docker compose logs --tail=30 $name 2>/dev/null || true
+
+              # Retry up to 5 times
+              success=false
+              for i in 1 2 3 4 5; do
+                response=$(curl -s -o /dev/null -w "%{http_code}" \
+                  --max-time 15 \
+                  http://localhost:$port/actuator/health)
+                if [ "$response" = "200" ]; then
+                  echo "✅ $name is healthy"
+                  success=true
+                  break
+                else
+                  echo "⏳ $name attempt $i failed (HTTP $response) - retrying in 30s..."
+                  sleep 30
+                fi
+              done
+
+              if [ "$success" = false ]; then
+                echo "❌ $name failed after 5 attempts"
+                docker logs $name --tail=30 2>/dev/null || true
                 all_healthy=false
               fi
             done

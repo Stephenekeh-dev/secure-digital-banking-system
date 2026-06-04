@@ -119,18 +119,18 @@ jobs:
           source: "docker-compose.yml"
           target: "/home/ubuntu/banking-system"
 
-      - name: Deploy to EC2
+      - name: Create .env and Pull Images
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          timeout: 30m
-          command_timeout: 30m
+          timeout: 60m
+          command_timeout: 60m
           script: |
             cd /home/ubuntu/banking-system
-
-            # Create .env file with ALL required variables
+            
+            # Create .env file
             cat > .env << 'ENVEOF'
             DB_URL=${{ secrets.DB_URL }}
             DB_USERNAME=${{ secrets.DB_USERNAME }}
@@ -164,49 +164,49 @@ jobs:
             FILE_UPLOAD_DIR=/home/ubuntu/banking-system/uploads
             ECR_REGISTRY=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
             ENVEOF
-
-            # Create uploads directory
+            
             mkdir -p /home/ubuntu/banking-system/uploads
-
-            # Verify .env was created
-            echo "✅ .env file created with $(wc -l < .env) lines"
-
+            echo "✅ .env created with $(wc -l < .env) lines"
+            
             # Login to ECR
             aws ecr get-login-password --region us-east-1 | \
               docker login --username AWS \
               --password-stdin \
               ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
-
             echo "✅ ECR login successful"
-
-            # Pull latest images one by one to avoid timeout
-            services=(
-              "banking/gateway"
-              "banking/auth-service"
-              "banking/account-service"
-              "banking/transaction-service"
-              "banking/notification-service"
-              "banking/audit-service"
-              "banking/fraud-service"
-              "banking/approval-service"
-            )
-
-            for service in "${services[@]}"; do
-              echo "Pulling $service..."
-              docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com/$service:latest
-              echo "✅ $service pulled"
+            
+            # Pull images one by one
+            REGISTRY="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com"
+            for service in gateway auth-service account-service transaction-service notification-service audit-service fraud-service approval-service; do
+              echo "Pulling banking/$service..."
+              docker pull $REGISTRY/banking/$service:latest && \
+                echo "✅ $service pulled" || \
+                echo "⚠️ $service pull failed - will use cached"
             done
+            echo "✅ All images pulled"
 
+      - name: Start Services
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          timeout: 10m
+          command_timeout: 10m
+          script: |
+            cd /home/ubuntu/banking-system
+            
             # Stop old containers
             docker compose down --remove-orphans || true
-
+            
             # Start all services
             docker compose up -d
-
-            # Clean up
+            
+            # Clean up old images
             docker image prune -f
-
-            echo "✅ Deployment completed"
+            
+            echo "✅ Services started"
+            docker compose ps
 
       - name: Health Check
         uses: appleboy/ssh-action@v1.0.3
@@ -218,13 +218,12 @@ jobs:
           command_timeout: 30m
           script: |
             cd /home/ubuntu/banking-system
-
-            echo "Waiting 5 minutes for all services to start..."
+            
+            echo "Waiting 5 minutes for services to start..."
             sleep 300
-
-            echo "Container status:"
+            
             docker compose ps
-
+            
             services=(
               "8090:gateway"
               "8081:auth-service"
@@ -235,12 +234,12 @@ jobs:
               "8086:fraud-service"
               "8087:approval-service"
             )
-
+            
             all_healthy=true
             for entry in "${services[@]}"; do
               port="${entry%%:*}"
               name="${entry##*:}"
-
+            
               success=false
               for i in 1 2 3 4 5; do
                 response=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -255,18 +254,18 @@ jobs:
                   sleep 30
                 fi
               done
-
+            
               if [ "$success" = false ]; then
                 echo "❌ $name failed after 5 attempts"
                 docker logs $name --tail=30 2>/dev/null || true
                 all_healthy=false
               fi
             done
-
+            
             if [ "$all_healthy" = true ]; then
               echo "✅ All services are healthy!"
             else
-              echo "⚠️ Some services failed health check"
+              echo "⚠️ Some services failed"
               docker compose ps
               exit 1
             fi

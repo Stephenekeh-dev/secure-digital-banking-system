@@ -195,18 +195,19 @@ jobs:
           command_timeout: 10m
           script: |
             cd /home/ubuntu/banking-system
-            
+
             # Stop old containers
-            docker compose down --remove-orphans || true
-            
+            docker-compose down || true
+
             # Start all services
-            docker compose up -d
-            
+            docker-compose up -d
+
             # Clean up old images
             docker image prune -f
-            
+
             echo "✅ Services started"
-            docker compose ps
+            docker-compose ps
+            
 
       - name: Health Check
         uses: appleboy/ssh-action@v1.0.3
@@ -218,14 +219,14 @@ jobs:
           command_timeout: 30m
           script: |
             cd /home/ubuntu/banking-system
-            
+
             echo "Waiting 5 minutes for services to start..."
             sleep 300
-            
-            docker compose ps
-            
+
+            docker-compose ps
+
             services=(
-              "8090:gateway"
+              "8080:gateway"
               "8081:auth-service"
               "8082:account-service"
               "8083:transaction-service"
@@ -234,12 +235,12 @@ jobs:
               "8086:fraud-service"
               "8087:approval-service"
             )
-            
+
             all_healthy=true
             for entry in "${services[@]}"; do
               port="${entry%%:*}"
               name="${entry##*:}"
-            
+
               success=false
               for i in 1 2 3 4 5; do
                 response=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -254,18 +255,18 @@ jobs:
                   sleep 30
                 fi
               done
-            
+
               if [ "$success" = false ]; then
                 echo "❌ $name failed after 5 attempts"
                 docker logs $name --tail=30 2>/dev/null || true
                 all_healthy=false
               fi
             done
-            
+
             if [ "$all_healthy" = true ]; then
               echo "✅ All services are healthy!"
             else
               echo "⚠️ Some services failed"
-              docker compose ps
+              docker-compose ps
               exit 1
             fi

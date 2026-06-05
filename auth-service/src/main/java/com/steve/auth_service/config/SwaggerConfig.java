@@ -16,12 +16,12 @@ public class SwaggerConfig {
     public OpenAPI openAPI() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("Auth Service API")
+                        .title("Auth Service API of the Microservices hosted on AWS EC2")
                         .description("Handles user registration, login and JWT token issuance")
                         .version("1.0.0")
                         .contact(new Contact()
                                 .name("Steve")
-                                .email("steve@bank.com")))
+                                .email("stevenadibee@yahoo.com")))
                 .addSecurityItem(
                         new SecurityRequirement().addList("Bearer Authentication"))
                 .components(new Components()

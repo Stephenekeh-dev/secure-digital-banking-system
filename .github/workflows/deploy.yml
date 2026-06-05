@@ -215,13 +215,13 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
-          timeout: 30m
-          command_timeout: 30m
+          timeout: 60m
+          command_timeout: 60m
           script: |
             cd /home/ubuntu/banking-system
 
-            echo "Waiting 5 minutes for services to start..."
-            sleep 300
+            echo "Waiting 10 minutes for all services to start..."
+            sleep 600
 
             docker-compose ps
 
@@ -251,8 +251,8 @@ jobs:
                   success=true
                   break
                 else
-                  echo "⏳ $name attempt $i (HTTP $response) retrying in 30s..."
-                  sleep 30
+                  echo "⏳ $name attempt $i (HTTP $response) retrying in 60s..."
+                  sleep 60
                 fi
               done
 

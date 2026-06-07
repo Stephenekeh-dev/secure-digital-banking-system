@@ -13,61 +13,55 @@ spring:
         - DedupeResponseHeader=Access-Control-Allow-Credentials Access-Control-Allow-Origin
 
       routes:
-        - id: auth-service
+        #  Swagger documentation routes
+        - id: auth-service-docs
           uri: ${AUTH_SERVICE_URL:http://localhost:8081}
           predicates:
-            - Path=/api/auth/**
+            - Path=/auth-service/v3/api-docs
           filters:
-            - StripPrefix=0
+            - RewritePath=/auth-service/v3/api-docs, /v3/api-docs
 
-        - id: account-service
+        - id: account-service-docs
           uri: ${ACCOUNT_SERVICE_URL:http://localhost:8082}
           predicates:
-            - Path=/api/accounts/**
+            - Path=/account-service/v3/api-docs
           filters:
-            - StripPrefix=0
-            - name: JwtAuthFilter
+            - RewritePath=/account-service/v3/api-docs, /v3/api-docs
 
-        - id: transaction-service
+        - id: transaction-service-docs
           uri: ${TRANSACTION_SERVICE_URL:http://localhost:8083}
           predicates:
-            - Path=/api/transactions/**
+            - Path=/transaction-service/v3/api-docs
           filters:
-            - StripPrefix=0
-            - name: JwtAuthFilter
+            - RewritePath=/transaction-service/v3/api-docs, /v3/api-docs
 
-        - id: notification-service
+        - id: notification-service-docs
           uri: ${NOTIFICATION_SERVICE_URL:http://localhost:8084}
           predicates:
-            - Path=/api/notifications/**
+            - Path=/notification-service/v3/api-docs
           filters:
-            - StripPrefix=0
-            - name: JwtAuthFilter
+            - RewritePath=/notification-service/v3/api-docs, /v3/api-docs
 
-        - id: audit-service
+        - id: audit-service-docs
           uri: ${AUDIT_SERVICE_URL:http://localhost:8085}
           predicates:
-            - Path=/api/audit/**
+            - Path=/audit-service/v3/api-docs
           filters:
-            - StripPrefix=0
-            - name: JwtAuthFilter
+            - RewritePath=/audit-service/v3/api-docs, /v3/api-docs
 
-        - id: fraud-service
+        - id: fraud-service-docs
           uri: ${FRAUD_SERVICE_URL:http://localhost:8086}
           predicates:
-            - Path=/api/fraud/**
+            - Path=/fraud-service/v3/api-docs
           filters:
-            - StripPrefix=0
-            - name: JwtAuthFilter
+            - RewritePath=/fraud-service/v3/api-docs, /v3/api-docs
 
-        - id: approval-service
+        - id: approval-service-docs
           uri: ${APPROVAL_SERVICE_URL:http://localhost:8087}
           predicates:
-            - Path=/api/approvals/**
+            - Path=/approval-service/v3/api-docs
           filters:
-            - StripPrefix=0
-            - name: JwtAuthFilter
-
+            - RewritePath=/approval-service/v3/api-docs, /v3/api-docs
       globalcors:
         corsConfigurations:
           '[/**]':
@@ -85,6 +79,7 @@ springdoc:
     enabled: true
     path: /swagger-ui.html
     try-it-out-enabled: true
+    config-url: /v3/api-docs/swagger-config    # ← add this line
     urls:
       - name: auth-service
         url: /auth-service/v3/api-docs
